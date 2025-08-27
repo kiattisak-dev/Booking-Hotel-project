@@ -1,7 +1,7 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { DivideIcon as LucideIcon } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
+import { LucideIcon } from 'lucide-react';
 
 interface KPICardProps {
   title: string;
