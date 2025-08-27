@@ -1,0 +1,139 @@
+/* styles/globals.css */
+
+/* Tailwind base */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ------------------------------
+   Color tokens (LIGHT ONLY)
+   ใช้กับ shadcn/ui + Tailwind (HSL)
+-------------------------------- */
+:root {
+  --background: 0 0% 100%;
+  --foreground: 222.2 47.4% 11.2%;
+
+  --muted: 210 40% 96.1%;
+  --muted-foreground: 215.4 16.3% 46.9%;
+
+  --popover: 0 0% 100%;
+  --popover-foreground: 222.2 47.4% 11.2%;
+
+  --card: 0 0% 100%;
+  --card-foreground: 222.2 47.4% 11.2%;
+
+  --border: 214.3 31.8% 91.4%;
+  --input: 214.3 31.8% 91.4%;
+
+  /* primary = โทนน้ำเงินอ่านง่าย */
+  --primary: 221.2 83.2% 53.3%;
+  --primary-foreground: 210 40% 98%;
+
+  --secondary: 210 40% 96.1%;
+  --secondary-foreground: 222.2 47.4% 11.2%;
+
+  --accent: 210 40% 96.1%;
+  --accent-foreground: 222.2 47.4% 11.2%;
+
+  --destructive: 0 72% 51%;
+  --destructive-foreground: 210 40% 98%;
+
+  --ring: 221.2 83.2% 53.3%;
+
+  /* Radius มุมโค้งมาตรฐาน */
+  --radius: 0.75rem;
+}
+
+/* ------------------------------
+   Base resets + Typography
+-------------------------------- */
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  html, body, #__next {
+    height: 100%;
+  }
+
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-feature-settings: "liga","kern";
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  h1 { @apply text-3xl md:text-4xl font-semibold tracking-tight; }
+  h2 { @apply text-2xl md:text-3xl font-semibold tracking-tight; }
+  h3 { @apply text-xl md:text-2xl font-semibold tracking-tight; }
+
+  p  { @apply leading-7 text-gray-700; }
+  small { @apply text-sm text-gray-500; }
+
+  a  { @apply text-primary underline-offset-2 hover:underline; }
+
+  code, kbd, pre {
+    @apply rounded bg-muted text-sm px-1.5 py-0.5;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+
+  hr { @apply border-t border-border; }
+
+  /* ฟิลด์ฟอร์มโทน Light */
+  input, textarea, select {
+    @apply bg-white border border-input text-foreground rounded-md px-3 py-2 outline-none;
+  }
+  input::placeholder, textarea::placeholder {
+    @apply text-muted-foreground;
+  }
+  button {
+    @apply select-none;
+  }
+
+  /* Selection สีอ่อนอ่านง่าย */
+  ::selection {
+    background: hsl(var(--primary) / 0.18);
+    color: hsl(var(--foreground));
+  }
+
+  /* Focus ring ที่เห็นชัดใน Light mode */
+  :focus-visible {
+    outline: none;
+    box-shadow:
+      0 0 0 2px hsl(var(--background)),
+      0 0 0 4px hsl(var(--ring));
+  }
+}
+
+/* ------------------------------
+   Utilities (ช่วยเรื่อง layout)
+-------------------------------- */
+@layer utilities {
+  .container {
+    @apply mx-auto max-w-7xl px-4 sm:px-6 lg:px-8;
+  }
+
+  /* เงานุ่ม ๆ สำหรับการ์ด */
+  .shadow-soft {
+    @apply shadow-[0_1px_2px_rgba(0,0,0,0.04),0_4px_12px_rgba(0,0,0,0.06)];
+  }
+}
+
+/* ------------------------------
+   Scrollbar (เฉพาะ webkit) — โทนสว่าง
+-------------------------------- */
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+*::-webkit-scrollbar-track {
+  background: hsl(var(--muted));
+}
+*::-webkit-scrollbar-thumb {
+  background: hsl(var(--border));
+  border-radius: 9999px;
+  border: 2px solid hsl(var(--muted));
+}
+*::-webkit-scrollbar-thumb:hover {
+  background: hsl(var(--primary) / 0.45);
+}
