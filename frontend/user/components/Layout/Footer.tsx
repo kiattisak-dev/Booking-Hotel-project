@@ -8,7 +8,7 @@ export default function Footer() {
           <div className="col-span-1 md:col-span-2">
             <div className="flex items-center space-x-2 mb-4">
               <Hotel className="h-8 w-8" />
-              <span className="text-xl font-bold">Hotel Booking</span>
+              <span className="text-xl font-bold">Hotel Servicw Booking</span>
             </div>
             <p className="text-gray-300 mb-4">
               ระบบจองโรงแรมออนไลน์ที่ดีที่สุด พร้อมให้บริการคุณตลอด 24 ชั่วโมง

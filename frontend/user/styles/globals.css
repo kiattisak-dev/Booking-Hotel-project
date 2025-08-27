@@ -1,3 +1,158 @@
+/* styles/globals.css */
+
+/* Tailwind core */
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* ------------------------------
+   Design Tokens (LIGHT ONLY)
+   Compatible with shadcn/ui
+-------------------------------- */
+:root {
+  --background: 0 0% 100%;
+  --foreground: 222.2 47.4% 11.2%;
+
+  --muted: 210 40% 96.1%;
+  --muted-foreground: 215.4 16.3% 46.9%;
+
+  --popover: 0 0% 100%;
+  --popover-foreground: 222.2 47.4% 11.2%;
+
+  --card: 0 0% 100%;
+  --card-foreground: 222.2 47.4% 11.2%;
+
+  --border: 214.3 31.8% 91.4%;
+  --input: 214.3 31.8% 91.4%;
+
+  /* Primary สีเดียวกับ Admin เพื่อภาพรวมที่กลมกลืน */
+  --primary: 221.2 83.2% 53.3%;
+  --primary-foreground: 210 40% 98%;
+
+  --secondary: 210 40% 96.1%;
+  --secondary-foreground: 222.2 47.4% 11.2%;
+
+  --accent: 210 40% 96.1%;
+  --accent-foreground: 222.2 47.4% 11.2%;
+
+  --destructive: 0 72% 51%;
+  --destructive-foreground: 210 40% 98%;
+
+  --ring: 221.2 83.2% 53.3%;
+
+  --radius: 0.75rem;
+}
+
+/* ------------------------------
+   Base & Typography
+-------------------------------- */
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  html, body, #__next {
+    height: 100%;
+  }
+
+  body {
+    @apply bg-background text-foreground antialiased;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  h1 { @apply text-3xl md:text-4xl font-semibold tracking-tight; }
+  h2 { @apply text-2xl md:text-3xl font-semibold tracking-tight; }
+  h3 { @apply text-xl md:text-2xl font-semibold tracking-tight; }
+
+  p      { @apply leading-7 text-gray-700; }
+  small  { @apply text-sm text-gray-500; }
+  a      { @apply text-primary underline-offset-2 hover:underline; }
+
+  code, kbd, pre {
+    @apply rounded bg-muted text-sm px-1.5 py-0.5;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+
+  hr { @apply border-t border-border; }
+
+  /* ฟอร์มโทนสว่าง */
+  input, textarea, select {
+    @apply bg-white border border-input text-foreground rounded-md px-3 py-2 outline-none;
+  }
+  input::placeholder, textarea::placeholder {
+    @apply text-muted-foreground;
+  }
+
+  /* Selection สีอ่อน */
+  ::selection {
+    background: hsl(var(--primary) / 0.18);
+    color: hsl(var(--foreground));
+  }
+
+  /* Focus ring มองเห็นชัด */
+  :focus-visible {
+    outline: none;
+    box-shadow:
+      0 0 0 2px hsl(var(--background)),
+      0 0 0 4px hsl(var(--ring));
+  }
+}
+
+/* ------------------------------
+   Components & Utilities (User)
+-------------------------------- */
+@layer components {
+  /* การ์ดทั่วไป */
+  .card {
+    @apply rounded-2xl bg-card text-card-foreground border shadow-[0_1px_2px_rgba(0,0,0,0.04),0_8px_20px_rgba(0,0,0,0.06)];
+  }
+
+  /* ปุ่มหลักแบบยูทิล (กรณีไม่ได้ใช้ shadcn Button) */
+  .btn-primary {
+    @apply inline-flex items-center justify-center rounded-md px-4 py-2
+           bg-primary text-primary-foreground hover:opacity-95
+           focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2
+           ring-offset-background ring-primary;
+  }
+
+  /* Navbar ลิงก์ */
+  .nav-link {
+    @apply text-gray-700 hover:text-gray-900 hover:bg-gray-50 rounded-md px-3 py-2;
+  }
+}
+
+@layer utilities {
+  /* คอนเทนเนอร์หน้า User */
+  .container {
+    @apply mx-auto max-w-7xl px-4 sm:px-6 lg:px-8;
+  }
+
+  /* ส่วน hero ไล่เฉดอ่อน ๆ */
+  .hero-gradient {
+    background: radial-gradient(1200px 600px at 20% -10%, rgba(59,130,246,0.12), transparent),
+                radial-gradient(1000px 500px at 80% -20%, rgba(59,130,246,0.08), transparent);
+  }
+
+  .section {
+    @apply py-10 md:py-16;
+  }
+
+  .shadow-soft {
+    @apply shadow-[0_1px_2px_rgba(0,0,0,0.04),0_4px_12px_rgba(0,0,0,0.06)];
+  }
+}
+
+/* ------------------------------
+   Scrollbar (webkit) — โทนสว่าง
+-------------------------------- */
+*::-webkit-scrollbar { width: 10px; height: 10px; }
+*::-webkit-scrollbar-track { background: hsl(var(--muted)); }
+*::-webkit-scrollbar-thumb {
+  background: hsl(var(--border));
+  border-radius: 9999px;
+  border: 2px solid hsl(var(--muted));
+}
+*::-webkit-scrollbar-thumb:hover {
+  background: hsl(var(--primary) / 0.45);
+}

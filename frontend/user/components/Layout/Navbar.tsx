@@ -28,7 +28,7 @@ export default function Navbar() {
           <div className="flex items-center">
             <Link href="/" className="flex items-center space-x-2">
               <Hotel className="h-8 w-8 text-primary" />
-              <span className="text-xl font-bold text-primary">Hotel Booking</span>
+              <span className="text-xl font-bold text-primary">Hotel Service Booking</span>
             </Link>
           </div>
 
