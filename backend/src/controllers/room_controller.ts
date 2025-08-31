@@ -50,6 +50,14 @@ export const updateRoom = async (req: Request, res: Response) => {
   res.json(roomType);
 };
 
+export const updateRoomType = async (req: Request, res: Response) => {
+  const { typeId } = req.params;
+  const payload = req.body; // { type?, capacity?, bedType?, pricePerNight?, status?, description?, images? ... }
+  const updated = await RoomType.findByIdAndUpdate(typeId, payload, { new: true });
+  if (!updated) return res.status(404).json({ message: "RoomType not found" });
+  res.json(updated);
+};
+
 // DELETE /api/rooms/:typeId/rooms/:roomCode 
 export const deleteRoom = async (req: Request, res: Response) => {
   const { typeId, roomCode } = req.params;

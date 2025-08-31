@@ -1,117 +1,129 @@
-import React, { useState } from 'react';
-import { motion } from 'framer-motion';
-import Link from 'next/link';
-import { Plus, Search, Edit, Trash2 } from 'lucide-react';
-import AdminLayout from '@/components/admin/AdminLayout';
-import AdminTable from '@/components/admin/AdminTable';
-import StatusBadge from '@/components/admin/StatusBadge';
-import ConfirmDialog from '@/components/admin/ConfirmDialog';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Badge } from '@/components/ui/badge';
-import { withAdminAuth } from '@/lib/auth-guards';
+import React, { useEffect, useState } from "react";
+import { motion } from "framer-motion";
+import Link from "next/link";
+import { Plus, Search, Edit, Trash2 } from "lucide-react";
+import AdminLayout from "@/components/admin/AdminLayout";
+import AdminTable from "@/components/admin/AdminTable";
+import StatusBadge from "@/components/admin/StatusBadge";
+import ConfirmDialog from "@/components/admin/ConfirmDialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
+import { withAdminAuth } from "@/lib/auth-guards";
+import { apiFetch } from "@/lib/api";
+import EditPackageDialog, {
+  PackageDoc,
+} from "@/components/admin/EditPackageDialog";
 
-// Mock data
-const packages = [
-  {
-    id: '1',
-    name: 'Weekend Getaway',
-    description: 'Perfect for a romantic weekend with breakfast included',
-    price: 150,
-    discountPercent: 10,
-    validFrom: '2025-01-01',
-    validTo: '2025-03-31',
-    active: true,
-    createdAt: '2025-01-01T00:00:00Z',
-  },
-  {
-    id: '2',
-    name: 'Business Package',
-    description: 'Ideal for business travelers with meeting room access',
-    discountPercent: 15,
-    validFrom: '2025-02-01',
-    validTo: '2025-12-31',
-    active: true,
-    createdAt: '2025-01-05T00:00:00Z',
-  },
-  {
-    id: '3',
-    name: 'Holiday Special',
-    description: 'Special holiday offer with spa access',
-    price: 200,
-    validFrom: '2024-12-01',
-    validTo: '2025-01-31',
-    active: false,
-    createdAt: '2024-11-15T00:00:00Z',
-  },
-];
+type Pkg = PackageDoc;
 
 function PackagesPage() {
-  const [searchTerm, setSearchTerm] = useState('');
+  const [searchTerm, setSearchTerm] = useState("");
+  const [rows, setRows] = useState<Pkg[]>([]);
   const [deleteDialog, setDeleteDialog] = useState<{
     open: boolean;
     packageId: string;
-  }>({ open: false, packageId: '' });
+  }>({ open: false, packageId: "" });
 
-  const handleDelete = (packageId: string) => {
+  const [editOpen, setEditOpen] = useState(false);
+  const [editing, setEditing] = useState<Pkg | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    apiFetch<Pkg[]>("/api/packages", { auth: true })
+      .then(setRows)
+      .catch(() => {});
+  }, []);
+
+  const handleDelete = (packageId: string) =>
     setDeleteDialog({ open: true, packageId });
-  };
 
   const confirmDelete = async () => {
-    console.log('Delete package:', deleteDialog.packageId);
-    // Mock API call - replace with actual implementation
-    setDeleteDialog({ open: false, packageId: '' });
+    await apiFetch(`/api/packages/${deleteDialog.packageId}`, {
+      method: "DELETE",
+      auth: true,
+    });
+    setRows((prev) => prev.filter((p) => p._id !== deleteDialog.packageId));
+    setDeleteDialog({ open: false, packageId: "" });
   };
 
+  const handleOpenEdit = (pkg: Pkg) => {
+    setEditing(pkg);
+    setEditOpen(true);
+  };
+
+  const handleSubmitEdit = async (payload: Partial<Pkg>) => {
+    if (!editing?._id) return;
+    setSaving(true);
+    try {
+      const updated = await apiFetch<Pkg>(`/api/packages/${editing._id}`, {
+        method: "PATCH",
+        auth: true,
+        body: JSON.stringify(payload),
+      });
+      setRows((prev) => prev.map((p) => (p._id === updated._id ? updated : p)));
+      setEditOpen(false);
+      setEditing(null);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const filtered = rows.filter((p) =>
+    p.name.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
   const packageColumns = [
-    { key: 'name', label: 'Package Name' },
-    { 
-      key: 'description', 
-      label: 'Description',
-      render: (value: string) => (
-        <div className="max-w-xs truncate" title={value}>
-          {value}
+    { key: "name", label: "Package Name" },
+    {
+      key: "description",
+      label: "Description",
+      render: (v: string) => (
+        <div className="max-w-xs truncate" title={v}>
+          {v}
         </div>
-      )
+      ),
     },
-    { 
-      key: 'pricing', 
-      label: 'Pricing',
-      render: (value: any, row: any) => (
+    {
+      key: "pricing",
+      label: "Pricing",
+      render: (_: any, row: any) => (
         <div className="space-y-1">
-          {row.price && (
-            <div className="text-sm font-medium">${row.price}</div>
-          )}
+          {row.price && <div className="text-sm font-medium">${row.price}</div>}
           {row.discountPercent && (
             <Badge variant="outline" className="bg-green-50 text-green-700">
               {row.discountPercent}% off
             </Badge>
           )}
         </div>
-      )
+      ),
     },
-    { key: 'validFrom', label: 'Valid From' },
-    { key: 'validTo', label: 'Valid To' },
-    { 
-      key: 'active', 
-      label: 'Status',
-      render: (value: boolean) => <StatusBadge status={value ? 'active' : 'inactive'} />
+    { key: "validFrom", label: "Valid From" },
+    { key: "validTo", label: "Valid To" },
+    {
+      key: "active",
+      label: "Status",
+      render: (v: boolean) => (
+        <StatusBadge status={v ? "active" : "inactive"} />
+      ),
     },
     {
-      key: 'actions',
-      label: 'Actions',
-      render: (value: any, row: any) => (
+      key: "actions",
+      label: "Actions",
+      render: (_: any, row: Pkg) => (
         <div className="flex gap-2">
-          <Link href={`/admin/packages/${row.id}`}>
-            <Button variant="outline" size="sm">
-              <Edit className="mr-1 h-3 w-3" />
-              Edit
-            </Button>
-          </Link>
           <Button
             variant="outline"
             size="sm"
-            onClick={() => handleDelete(row.id)}
+            onClick={() => handleOpenEdit(row)}
+          >
+            <Edit className="mr-1 h-3 w-3" />
+            Edit
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => handleDelete(row._id)}
             className="text-red-600 hover:text-red-700"
           >
             <Trash2 className="mr-1 h-3 w-3" />
@@ -139,7 +151,6 @@ function PackagesPage() {
           </Link>
         </motion.div>
 
-        {/* Search */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -155,13 +166,12 @@ function PackagesPage() {
           </div>
         </motion.div>
 
-        {/* Table */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1 }}
         >
-          <AdminTable columns={packageColumns} data={packages} />
+          <AdminTable columns={packageColumns} data={filtered} />
         </motion.div>
 
         <ConfirmDialog
@@ -172,6 +182,27 @@ function PackagesPage() {
           confirmText="Delete"
           onConfirm={confirmDelete}
           variant="destructive"
+        />
+
+        <EditPackageDialog
+          open={editOpen}
+          onOpenChange={(v) => {
+            setEditOpen(v);
+            if (!v) setEditing(null);
+          }}
+          initial={editing}
+          submitting={saving}
+          onSubmit={async (vals) => {
+            await handleSubmitEdit({
+              name: vals.name,
+              description: vals.description || "",
+              price: vals.price,
+              discountPercent: vals.discountPercent,
+              validFrom: vals.validFrom,
+              validTo: vals.validTo,
+              active: vals.active,
+            });
+          }}
         />
       </div>
     </AdminLayout>

@@ -1,21 +1,25 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { useRouter } from 'next/router';
 import { useAuthStore } from '@/lib/stores/auth';
 
-export function withAdminAuth<T extends Record<string, any>>(
-  WrappedComponent: React.ComponentType<T>
-) {
-  const AuthenticatedComponent = (props: T) => {
+export function withAdminAuth<T extends Record<string, any>>(Wrapped: React.ComponentType<T>) {
+  const Guard: React.FC<T> = (props) => {
     const router = useRouter();
-    const { isAuthenticated, user } = useAuthStore();
+    const { isAuthenticated, user, hasHydrated } = useAuthStore();
+    const redirected = useRef(false);
 
     useEffect(() => {
-      if (!isAuthenticated || user?.role !== 'ADMIN') {
-        router.push('/login');
+      if (!hasHydrated) return;
+      if (redirected.current) return;
+      const ok = isAuthenticated && user?.role === 'ADMIN';
+      if (!ok) {
+        redirected.current = true;
+        const redirect = typeof window !== 'undefined' ? window.location.pathname : '/admin';
+        router.replace(`/login?redirect=${encodeURIComponent(redirect)}`);
       }
-    }, [isAuthenticated, user, router]);
+    }, [hasHydrated, isAuthenticated, user, router]);
 
-    if (!isAuthenticated || user?.role !== 'ADMIN') {
+    if (!hasHydrated) {
       return (
         <div className="flex min-h-screen items-center justify-center">
           <div className="text-center">
@@ -26,10 +30,10 @@ export function withAdminAuth<T extends Record<string, any>>(
       );
     }
 
-    return <WrappedComponent {...props} />;
+    if (!(isAuthenticated && user?.role === 'ADMIN')) return null;
+    return <Wrapped {...(props as T)} />;
   };
 
-  AuthenticatedComponent.displayName = `withAdminAuth(${WrappedComponent.displayName || WrappedComponent.name})`;
-
-  return AuthenticatedComponent;
+  Guard.displayName = `withAdminAuth(${Wrapped.displayName || Wrapped.name})`;
+  return Guard;
 }

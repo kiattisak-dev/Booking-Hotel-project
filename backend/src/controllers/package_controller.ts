@@ -9,6 +9,12 @@ export const createPackage = async (req: Request, res: Response) => {
   res.status(201).json(await Package.create(req.body));
 };
 
+export const updatePackage = async (req: Request, res: Response) => {
+  const updated = await Package.findByIdAndUpdate(req.params.id, req.body, { new: true });
+  if (!updated) return res.status(404).json({ message: "Package not found" });
+  res.json(updated);
+};
+
 export const deletePackage = async (req: Request, res: Response) => {
   await Package.findByIdAndDelete(req.params.id);
   res.json({ message: "Package deleted" });

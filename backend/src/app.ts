@@ -10,9 +10,11 @@ import packageRoutes from "./routes/package_routes";
 import bookingRoutes from "./routes/booking_routes";
 import paymentRoutes from "./routes/payment_routes";
 import { connectDB } from "./configs/db";
+import { startSchedulers } from "./jobs/schedulers";
 
 dotenv.config();
 connectDB();
+startSchedulers(); 
 
 const app = express();
 

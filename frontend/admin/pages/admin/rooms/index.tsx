@@ -1,84 +1,202 @@
-import React, { useState } from 'react';
-import { motion } from 'framer-motion';
-import Link from 'next/link';
-import { Plus, Search, Filter } from 'lucide-react';
-import AdminLayout from '@/components/admin/AdminLayout';
-import AdminTable from '@/components/admin/AdminTable';
-import StatusBadge from '@/components/admin/StatusBadge';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { withAdminAuth } from '@/lib/auth-guards';
+// pages/admin/rooms/index.tsx
+import React, { useEffect, useMemo, useState } from "react";
+import { motion } from "framer-motion";
+import Link from "next/link";
+import { Plus, Search, Edit } from "lucide-react";
+import AdminLayout from "@/components/admin/AdminLayout";
+import AdminTable from "@/components/admin/AdminTable";
+import StatusBadge from "@/components/admin/StatusBadge";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { withAdminAuth } from "@/lib/auth-guards";
+import { apiFetch } from "@/lib/api";
+import EditRoomDialog, {
+  EditRoomInitial,
+} from "@/components/admin/EditRoomDialog";
 
-// Mock data
-const rooms = [
-  {
-    id: '1',
-    code: 'S101',
-    name: 'Standard Single',
-    type: 'Standard',
-    capacity: 1,
-    bedType: 'Single',
-    pricePerNight: 800,
-    status: 'active',
-  },
-  {
-    id: '2',
-    code: 'D202',
-    name: 'Deluxe Double',
-    type: 'Deluxe',
-    capacity: 2,
-    bedType: 'Double',
-    pricePerNight: 1200,
-    status: 'active',
-  },
-  {
-    id: '3',
-    code: 'ST301',
-    name: 'Suite Premium',
-    type: 'Suite',
-    capacity: 4,
-    bedType: 'King + Sofa',
-    pricePerNight: 2400,
-    status: 'inactive',
-  },
-];
+type RoomTypeDoc = {
+  _id: string;
+  type: string;
+  capacity?: number;
+  bedType?: string;
+  pricePerNight?: number;
+  status?: "active" | "inactive";
+  rooms: {
+    code: string;
+    status?: "available" | "occupied" | "maintenance" | "inactive";
+  }[];
+};
 
-const roomColumns = [
-  { key: 'code', label: 'Room Code' },
-  { key: 'name', label: 'Name' },
-  { key: 'type', label: 'Type' },
-  { key: 'capacity', label: 'Capacity' },
-  { key: 'bedType', label: 'Bed Type' },
-  { 
-    key: 'pricePerNight', 
-    label: 'Price/Night',
-    render: (value: number) => `$${value}`
-  },
-  { 
-    key: 'status', 
-    label: 'Status',
-    render: (value: string) => <StatusBadge status={value} />
-  },
-  {
-    key: 'actions',
-    label: 'Actions',
-    render: (value: any, row: any) => (
-      <div className="flex gap-2">
-        <Link href={`/admin/rooms/${row.id}`}>
-          <Button variant="outline" size="sm">
-            Edit
-          </Button>
-        </Link>
-      </div>
-    ),
-  },
-];
+type Row = {
+  id: string; // `${typeId}:${roomCode}`
+  typeId: string;
+  code: string;
+  name: string;
+  type: string;
+  capacity: number;
+  bedType: string;
+  pricePerNight: number;
+  status: "active" | "inactive" | string; // type status
+  roomStatus?: "available" | "occupied" | "maintenance" | "inactive";
+};
 
 function RoomsPage() {
-  const [searchTerm, setSearchTerm] = useState('');
-  const [typeFilter, setTypeFilter] = useState('all');
-  const [statusFilter, setStatusFilter] = useState('all');
+  const [searchTerm, setSearchTerm] = useState("");
+  const [typeFilter, setTypeFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [data, setData] = useState<Row[]>([]);
+
+  const [editOpen, setEditOpen] = useState(false);
+  const [editing, setEditing] = useState<EditRoomInitial | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  async function fetchData() {
+    const types = await apiFetch<RoomTypeDoc[]>("/api/rooms", { auth: true });
+    const flat: Row[] = (types || []).flatMap(
+      (
+        rt: RoomTypeDoc
+      ) =>
+        (rt.rooms || []).map((r) => ({
+          id: `${rt._id}:${r.code}`,
+          typeId: rt._id,
+          code: r.code,
+          name: `${rt.type} ${r.code}`,
+          type: rt.type,
+          capacity: rt.capacity ?? 0,
+          bedType: rt.bedType ?? "-",
+          pricePerNight: rt.pricePerNight ?? 0,
+          status: rt.status ?? "inactive",
+          roomStatus: r.status ?? "available",
+        }))
+    );
+    setData(flat);
+  }
+
+  useEffect(() => {
+    fetchData().catch(() => {});
+  }, []);
+
+  const filtered = useMemo(() => {
+    return data.filter((row) => {
+      const okType = typeFilter === "all" || row.type === typeFilter;
+      const okStatus = statusFilter === "all" || row.status === statusFilter;
+      const q = searchTerm.toLowerCase();
+      const okQuery =
+        !q ||
+        row.code.toLowerCase().includes(q) ||
+        row.name.toLowerCase().includes(q);
+      return okType && okStatus && okQuery;
+    });
+  }, [data, typeFilter, statusFilter, searchTerm]);
+
+  const openEdit = (row: Row) => {
+    setEditing({
+      typeId: row.typeId,
+      roomCode: row.code,
+      type: row.type,
+      capacity: row.capacity,
+      bedType: row.bedType,
+      pricePerNight: row.pricePerNight,
+      typeStatus: (row.status as "active" | "inactive") ?? "active",
+      roomStatus: row.roomStatus ?? "available",
+    });
+    setEditOpen(true);
+  };
+
+  const saveEdit = async (vals: {
+    capacity?: number;
+    bedType?: string;
+    pricePerNight?: number;
+    typeStatus?: "active" | "inactive";
+    roomStatus?: "available" | "occupied" | "maintenance" | "inactive";
+  }) => {
+    if (!editing) return;
+    setSaving(true);
+    try {
+      // อัปเดต type-level
+      const typePayload: any = {};
+      if (vals.capacity !== undefined) typePayload.capacity = vals.capacity;
+      if (vals.bedType !== undefined) typePayload.bedType = vals.bedType;
+      if (vals.pricePerNight !== undefined)
+        typePayload.pricePerNight = vals.pricePerNight;
+      if (vals.typeStatus !== undefined) typePayload.status = vals.typeStatus;
+
+      if (Object.keys(typePayload).length) {
+        await apiFetch(`/api/rooms/${editing.typeId}`, {
+          method: "PATCH",
+          auth: true,
+          body: JSON.stringify(typePayload),
+        });
+      }
+
+      // อัปเดต room-level (status)
+      if (vals.roomStatus !== undefined) {
+        await apiFetch(
+          `/api/rooms/${editing.typeId}/rooms/${encodeURIComponent(
+            editing.roomCode
+          )}`,
+          {
+            method: "PUT",
+            auth: true,
+            body: JSON.stringify({ status: vals.roomStatus }),
+          }
+        );
+      }
+
+      await fetchData();
+      setEditOpen(false);
+      setEditing(null);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const roomColumns = [
+    { key: "code", label: "Room Code" },
+    { key: "name", label: "Name" },
+    { key: "type", label: "Type" },
+    { key: "capacity", label: "Capacity" },
+    { key: "bedType", label: "Bed Type" },
+    {
+      key: "pricePerNight",
+      label: "Price/Night",
+      render: (v: number) => `$${v}`,
+    },
+    {
+      key: "status",
+      label: "Type Status",
+      render: (v: string) => <StatusBadge status={v} />,
+    },
+    {
+      key: "roomStatus",
+      label: "Room Status",
+      render: (v: string) => <StatusBadge status={v} />,
+    },
+    {
+      key: "actions",
+      label: "Actions",
+      render: (_: any, row: Row) => (
+        <div className="flex gap-2">
+          <Button variant="outline" size="sm" onClick={() => openEdit(row)}>
+            <Edit className="mr-1 h-3 w-3" />
+            Edit
+          </Button>
+          <Link href={`/admin/rooms/${row.id}`}>
+            <Button variant="outline" size="sm">
+              Detail
+            </Button>
+          </Link>
+        </div>
+      ),
+    },
+  ];
 
   return (
     <AdminLayout>
@@ -97,7 +215,6 @@ function RoomsPage() {
           </Link>
         </motion.div>
 
-        {/* Filters */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -137,14 +254,26 @@ function RoomsPage() {
           </div>
         </motion.div>
 
-        {/* Table */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1 }}
         >
-          <AdminTable columns={roomColumns} data={rooms} />
+          <AdminTable columns={roomColumns} data={filtered} />
         </motion.div>
+
+        <EditRoomDialog
+          open={editOpen}
+          onOpenChange={(v) => {
+            setEditOpen(v);
+            if (!v) setEditing(null);
+          }}
+          initial={editing}
+          submitting={saving}
+          onSubmit={async (vals) => {
+            await saveEdit(vals);
+          }}
+        />
       </div>
     </AdminLayout>
   );

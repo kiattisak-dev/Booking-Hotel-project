@@ -1,8 +1,7 @@
-// components/admin/AdminLayout.tsx
-import React, { useEffect, useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { useRouter } from 'next/router';
-import Link from 'next/link';
+import React, { useEffect, useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { useRouter } from "next/router";
+import Link from "next/link";
 import {
   LayoutDashboard,
   Bed,
@@ -15,33 +14,33 @@ import {
   User,
   ChevronLeft,
   ChevronRight,
-} from 'lucide-react';
-import { useUIStore } from '@/lib/stores/ui';
-import { useAuthStore } from '@/lib/stores/auth';
-import { Button } from '@/components/ui/button';
-import { cn } from '@/lib/utils';
+} from "lucide-react";
+import { useUIStore } from "@/lib/stores/ui";
+import { useAuthStore } from "@/lib/stores/auth";
+import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 
 interface AdminLayoutProps {
   children: React.ReactNode;
 }
 
 const navigation = [
-  { name: 'Dashboard', href: '/admin', icon: LayoutDashboard },
-  { name: 'Rooms', href: '/admin/rooms', icon: Bed },
-  { name: 'Packages', href: '/admin/packages', icon: Package },
-  { name: 'Bookings', href: '/admin/bookings', icon: Calendar },
-  { name: 'Payments', href: '/admin/payments', icon: CreditCard },
+  { name: "Dashboard", href: "/admin", icon: LayoutDashboard },
+  { name: "Rooms", href: "/admin/rooms", icon: Bed },
+  { name: "Packages", href: "/admin/packages", icon: Package },
+  { name: "Bookings", href: "/admin/bookings", icon: Calendar },
+  { name: "Payments", href: "/admin/payments", icon: CreditCard },
 ];
 
 // breakpoint lg
 function useIsDesktop() {
   const [isDesktop, setIsDesktop] = useState(false);
   useEffect(() => {
-    const mq = window.matchMedia('(min-width: 1024px)');
+    const mq = window.matchMedia("(min-width: 1024px)");
     const update = () => setIsDesktop(mq.matches);
     update();
-    mq.addEventListener?.('change', update);
-    return () => mq.removeEventListener?.('change', update);
+    mq.addEventListener?.("change", update);
+    return () => mq.removeEventListener?.("change", update);
   }, []);
   return isDesktop;
 }
@@ -55,11 +54,10 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
 
   const handleLogout = () => {
     logout();
-    router.push('/');
+    router.push("/");
   };
 
-  // ขนาด sidebar ตอนกาง/ตอนพับ (เฉพาะ desktop)
-  const DESKTOP_OPEN = 256;  // 16rem
+  const DESKTOP_OPEN = 256; // 16rem
   const DESKTOP_COLLAPSED = 64; // 4rem
 
   return (
@@ -83,25 +81,21 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
       <AnimatePresence initial={false} mode="popLayout">
         <motion.aside
           key="admin-sidebar"
-          // Mobile: slide เข้า/ออก | Desktop: animate width
           initial={false}
           animate={
             isDesktop
               ? { width: sidebarOpen ? DESKTOP_OPEN : DESKTOP_COLLAPSED }
               : { x: sidebarOpen ? 0 : -280, width: DESKTOP_OPEN }
           }
-          transition={{ type: 'spring', stiffness: 260, damping: 28 }}
+          transition={{ type: "spring", stiffness: 260, damping: 28 }}
           className={cn(
-            'bg-white shadow-lg lg:shadow-none z-50 lg:z-0',
-            // mobile fixed overlay; desktop อยู่ใน flow
-            'fixed inset-y-0 left-0 lg:relative',
-            'flex flex-col',
-            // ให้ layout ฝั่งขวาขยับตาม width เมื่อเป็น desktop
-            isDesktop ? '' : 'w-64'
+            "bg-white shadow-lg lg:shadow-none z-50 lg:z-0",
+            "fixed inset-y-0 left-0 lg:relative",
+            "flex flex-col",
+            isDesktop ? "" : "w-64"
           )}
           style={isDesktop ? undefined : { width: DESKTOP_OPEN }}
         >
-          {/* ปุ่ม toggle (เดสก์ท็อป) — วางไว้ "ใน" sidebar ชิดขอบขวา */}
           <div className="absolute right-[-12px] top-4 hidden lg:block">
             <motion.button
               whileTap={{ scale: 0.95 }}
@@ -134,16 +128,19 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
                 opacity: isDesktop ? (sidebarOpen ? 1 : 0) : 1,
               }}
               className={cn(
-                'text-xl font-bold text-gray-900',
-                isDesktop && !sidebarOpen && 'pointer-events-none select-none'
+                "text-xl font-bold text-gray-900",
+                isDesktop && !sidebarOpen && "pointer-events-none select-none"
               )}
             >
               Hotel Admin
             </motion.div>
 
-            {/* ปุ่มปิด (มือถือ) */}
             {!isDesktop && (
-              <Button variant="ghost" size="sm" onClick={() => setSidebarOpen(false)}>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setSidebarOpen(false)}
+              >
                 <X className="h-5 w-5" />
               </Button>
             )}
@@ -160,23 +157,27 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
                       href={item.href}
                       title={item.name}
                       className={cn(
-                        'flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
+                        "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
                         isActive
-                          ? 'bg-blue-50 text-blue-700'
-                          : 'text-gray-700 hover:bg-gray-50 hover:text-gray-900'
+                          ? "bg-blue-50 text-blue-700"
+                          : "text-gray-700 hover:bg-gray-50 hover:text-gray-900"
                       )}
                     >
                       <item.icon className="h-5 w-5 flex-shrink-0" />
-                      {/* แอนิเมชันโชว์/ซ่อนป้ายชื่อเมื่อพับ */}
+
                       <motion.span
                         initial={false}
                         animate={{
                           opacity: isDesktop ? (sidebarOpen ? 1 : 0) : 1,
-                          width: isDesktop ? (sidebarOpen ? 'auto' : 0) : 'auto',
+                          width: isDesktop
+                            ? sidebarOpen
+                              ? "auto"
+                              : 0
+                            : "auto",
                         }}
                         className={cn(
-                          'truncate',
-                          isDesktop && !sidebarOpen && 'overflow-hidden'
+                          "truncate",
+                          isDesktop && !sidebarOpen && "overflow-hidden"
                         )}
                       >
                         {item.name}
@@ -198,11 +199,11 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
                 initial={false}
                 animate={{
                   opacity: isDesktop ? (sidebarOpen ? 1 : 0) : 1,
-                  width: isDesktop ? (sidebarOpen ? 'auto' : 0) : 'auto',
+                  width: isDesktop ? (sidebarOpen ? "auto" : 0) : "auto",
                 }}
                 className={cn(
-                  'flex-1 truncate',
-                  isDesktop && !sidebarOpen && 'overflow-hidden'
+                  "flex-1 truncate",
+                  isDesktop && !sidebarOpen && "overflow-hidden"
                 )}
               >
                 <p className="text-sm font-medium text-gray-900">
@@ -215,9 +216,12 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
               initial={false}
               animate={{
                 opacity: isDesktop ? (sidebarOpen ? 1 : 0) : 1,
-                height: isDesktop ? (sidebarOpen ? 'auto' : 0) : 'auto',
+                height: isDesktop ? (sidebarOpen ? "auto" : 0) : "auto",
               }}
-              className={cn('mt-3', isDesktop && !sidebarOpen && 'overflow-hidden')}
+              className={cn(
+                "mt-3",
+                isDesktop && !sidebarOpen && "overflow-hidden"
+              )}
             >
               <Button
                 variant="ghost"
@@ -226,7 +230,9 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
                 className="w-full justify-start gap-2 text-gray-700"
               >
                 <LogOut className="h-4 w-4" />
-                <span className={cn(isDesktop && !sidebarOpen && 'hidden')}>Logout</span>
+                <span className={cn(isDesktop && !sidebarOpen && "hidden")}>
+                  Logout
+                </span>
               </Button>
             </motion.div>
           </div>
@@ -238,7 +244,6 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
         {/* Top bar */}
         <header className="bg-white shadow-sm">
           <div className="flex h-16 items-center justify-between px-6">
-            {/* ปุ่ม Menu เฉพาะ mobile เพื่อเปิด sidebar */}
             <Button
               variant="ghost"
               size="sm"
@@ -250,11 +255,11 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
 
             <div className="flex items-center gap-4">
               <div className="text-sm text-gray-500">
-                {new Date().toLocaleDateString('en-US', {
-                  weekday: 'long',
-                  year: 'numeric',
-                  month: 'long',
-                  day: 'numeric',
+                {new Date().toLocaleDateString("en-US", {
+                  weekday: "long",
+                  year: "numeric",
+                  month: "long",
+                  day: "numeric",
                 })}
               </div>
             </div>
