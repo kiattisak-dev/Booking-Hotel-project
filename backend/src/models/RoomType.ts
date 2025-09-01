@@ -4,13 +4,13 @@ export type RoomSmallStatus = "available" | "occupied" | "maintenance" | "inacti
 export type RoomTypeStatus = "active" | "inactive";
 
 export interface IRoomSmall {
-  code: string;                
-  status?: RoomSmallStatus;    
-  images?: string[];           
+  code: string;
+  status?: RoomSmallStatus;
+  images?: string[];
 }
 
 export interface IRoomType extends Document {
-  type: string;               
+  type: string;
   description?: string;
   capacity?: number;
   bedType?: string;
@@ -18,7 +18,7 @@ export interface IRoomType extends Document {
   amenities?: string[];
   images?: string[];
   status?: RoomTypeStatus;
-  rooms: IRoomSmall[];      
+  rooms: IRoomSmall[];
 }
 
 const roomSmallSchema = new Schema<IRoomSmall>(

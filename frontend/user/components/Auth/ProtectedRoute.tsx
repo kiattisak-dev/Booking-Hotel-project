@@ -1,25 +1,32 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import { useAuth } from '@/store/useAuth';
 
-interface ProtectedRouteProps {
-  children: React.ReactNode;
-}
+type Props = { children: React.ReactNode };
 
-export default function ProtectedRoute({ children }: ProtectedRouteProps) {
+export default function ProtectedRoute({ children }: Props) {
   const router = useRouter();
   const { isAuthenticated, setIntendedPath } = useAuth();
+  const [hydrated, setHydrated] = useState(false);
+
+  useEffect(() => { setHydrated(true); }, []);
 
   useEffect(() => {
+    if (!hydrated) return;
     if (!isAuthenticated) {
       setIntendedPath(router.asPath);
-      router.push('/login');
+      router.replace('/login');
     }
-  }, [isAuthenticated, router]);
+  }, [hydrated, isAuthenticated, router, setIntendedPath]);
 
-  if (!isAuthenticated) {
-    return <div>กำลังตรวจสอบการเข้าสู่ระบบ...</div>;
+  if (!hydrated) {
+    return (
+      <div className="flex min-h-[50vh] items-center justify-center text-gray-500">
+        Loading...
+      </div>
+    );
   }
 
+  if (!isAuthenticated) return null;
   return <>{children}</>;
 }

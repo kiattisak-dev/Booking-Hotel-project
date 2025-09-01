@@ -1,133 +1,162 @@
-import { Room, Package, Booking, User, Payment, SearchFilters } from '@/types';
-import { mockRooms, mockPackages, mockBookings } from './mock-data';
+import { Room, Package, Booking, User, Payment, SearchFilters } from "@/types";
+import { useAuth } from "@/store/useAuth";
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || '';
+export const API_BASE = (process.env.NEXT_PUBLIC_API_BASE_URL || "").replace(
+  /\/$/,
+  ""
+);
 
-// Simulate API delay
-const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+type Options = RequestInit & { auth?: boolean; isFormData?: boolean };
 
-// Auth APIs
+export async function apiFetch<T = any>(path: string, opts: Options = {}) {
+  const headers: HeadersInit = opts.isFormData
+    ? { ...(opts.headers || {}) }
+    : { "Content-Type": "application/json", ...(opts.headers || {}) };
+  if (opts.auth) {
+    const token = useAuth.getState().user?.token;
+    if (token) {
+      (headers as Record<string, string>)["Authorization"] = `Bearer ${token}`;
+      if (typeof document !== "undefined") {
+        const role = useAuth.getState().user?.role || "USER";
+        const isProd = window.location.protocol === "https:";
+        document.cookie = `auth_token=${token}; path=/; ${
+          isProd ? "Secure; SameSite=None;" : ""
+        }`;
+        document.cookie = `auth_role=${role}; path=/; ${
+          isProd ? "Secure; SameSite=None;" : ""
+        }`;
+      }
+    }
+  }
+  const res = await fetch(`${API_BASE}${path}`, {
+    ...opts,
+    headers,
+    credentials: "include",
+  });
+  if (!res.ok) {
+    const msg = await res.text().catch(() => "");
+    throw new Error(msg || `HTTP ${res.status}`);
+  }
+  const text = await res.text();
+  return text ? (JSON.parse(text) as T) : (undefined as any);
+}
+
 export const authAPI = {
-  register: async (data: { name: string; email: string; password: string }): Promise<User> => {
-    await delay(1000);
-    return {
-      id: '1',
-      name: data.name,
-      email: data.email,
-    };
-  },
-
+  register: async (data: {
+    name: string;
+    email: string;
+    password: string;
+  }): Promise<User> =>
+    apiFetch<User>("/api/auth/register", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
   login: async (data: { email: string; password: string }): Promise<User> => {
-    await delay(1000);
-    return {
-      id: '1',
-      name: 'John Doe',
-      email: data.email,
-    };
+    const res = await apiFetch<{ user: Omit<User, "token">; token: string }>(
+      "/api/auth/login",
+      { method: "POST", body: JSON.stringify(data) }
+    );
+    return { ...res.user, token: res.token };
   },
-
-  me: async (): Promise<User> => {
-    await delay(500);
-    return {
-      id: '1',
-      name: 'John Doe',
-      email: 'john@example.com',
-    };
-  },
+  me: async (): Promise<User> =>
+    apiFetch<User>("/api/auth/profile", { auth: true }),
 };
 
-// Room APIs
 export const roomAPI = {
   getAvailable: async (filters: SearchFilters): Promise<Room[]> => {
-    await delay(1000);
-    return mockRooms.filter(room => {
-      if (filters.guests && room.maxGuests < filters.guests) return false;
-      if (filters.roomType && room.type !== filters.roomType) return false;
-      if (filters.minPrice && room.price < filters.minPrice) return false;
-      if (filters.maxPrice && room.price > filters.maxPrice) return false;
-      return true;
-    });
+    const q = new URLSearchParams();
+    if (filters.checkIn) q.set("checkIn", filters.checkIn);
+    if (filters.checkOut) q.set("checkOut", filters.checkOut);
+    if (typeof filters.guests === "number")
+      q.set("guests", String(filters.guests));
+    if (typeof filters.minPrice === "number")
+      q.set("minPrice", String(filters.minPrice));
+    if (typeof filters.maxPrice === "number")
+      q.set("maxPrice", String(filters.maxPrice));
+    if (filters.roomType) q.set("roomType", filters.roomType);
+    if (filters.amenities?.length)
+      q.set("amenities", filters.amenities.join(","));
+    const qs = q.toString();
+    return apiFetch<Room[]>(`/api/rooms/available${qs ? `?${qs}` : ""}`);
   },
-
-  getAll: async (page = 1, limit = 10): Promise<{ rooms: Room[]; total: number }> => {
-    await delay(800);
-    return {
-      rooms: mockRooms,
-      total: mockRooms.length,
-    };
-  },
-
-  getById: async (id: string): Promise<Room | null> => {
-    await delay(500);
-    return mockRooms.find(room => room.id === id) || null;
-  },
+  getAll: async (
+    page = 1,
+    limit = 10
+  ): Promise<{ rooms: Room[]; total: number }> =>
+    apiFetch<{ rooms: Room[]; total: number }>(
+      `/api/rooms?page=${page}&limit=${limit}`
+    ),
+  getById: async (id: string): Promise<Room> =>
+    apiFetch<Room>(`/api/rooms/${id}`),
 };
 
-// Package APIs
 export const packageAPI = {
-  getActive: async (): Promise<Package[]> => {
-    await delay(500);
-    return mockPackages.filter(pkg => pkg.active);
-  },
+  getActive: async (): Promise<Package[]> =>
+    apiFetch<Package[]>("/api/packages?active=true"),
 };
 
-// Booking APIs
 export const bookingAPI = {
   create: async (data: {
-    roomId: string;
+    roomId?: string;
+    roomTypeId?: string;
     checkIn: string;
     checkOut: string;
     guests: number;
     contactDetails: any;
-  }): Promise<Booking> => {
-    await delay(1000);
-    const room = mockRooms.find(r => r.id === data.roomId);
-    if (!room) throw new Error('Room not found');
-
-    return {
-      id: Date.now().toString(),
-      userId: '1',
-      roomId: data.roomId,
-      room,
-      checkIn: data.checkIn,
-      checkOut: data.checkOut,
-      guests: data.guests,
-      totalAmount: room.price * 2, // Simplified calculation
-      status: 'PENDING_PAYMENT' as any,
-      contactDetails: data.contactDetails,
-      createdAt: new Date().toISOString(),
-    };
-  },
-
-  getMyBookings: async (): Promise<Booking[]> => {
-    await delay(800);
-    return mockBookings;
-  },
-
-  attachPayment: async (bookingId: string, paymentId: string): Promise<Booking> => {
-    await delay(1000);
-    const booking = mockBookings.find(b => b.id === bookingId);
-    if (!booking) throw new Error('Booking not found');
-
-    return {
-      ...booking,
-      paymentId,
-      status: 'AWAITING_REVIEW' as any,
-    };
-  },
+  }): Promise<Booking> =>
+    apiFetch<Booking>("/api/bookings", {
+      method: "POST",
+      auth: true,
+      body: JSON.stringify(data),
+    }),
+  getMyBookings: async (): Promise<Booking[]> =>
+    apiFetch<Booking[]>("/api/bookings/me", { auth: true }),
+  attachPayment: async (
+    bookingId: string,
+    paymentId: string
+  ): Promise<Booking> =>
+    apiFetch<Booking>(`/api/bookings/${bookingId}/payment`, {
+      method: "PUT",
+      auth: true,
+      body: JSON.stringify({ paymentId }),
+    }),
 };
 
-// Payment APIs
+async function fileToDataUrl(f: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const fr = new FileReader();
+    fr.onload = () => resolve(String(fr.result));
+    fr.onerror = reject;
+    fr.readAsDataURL(f);
+  });
+}
+
 export const paymentAPI = {
-  uploadSlip: async (file: File, bookingId: string): Promise<Payment> => {
-    await delay(1500);
-    return {
-      id: Date.now().toString(),
-      bookingId,
-      amount: 2400,
-      slipUrl: URL.createObjectURL(file),
-      status: 'PENDING' as any,
-      createdAt: new Date().toISOString(),
-    };
+  uploadSlip: async (
+    file: File,
+    bookingId: string,
+    amount?: number
+  ): Promise<Payment> => {
+    const fileToDataUrl = (f: File) =>
+      new Promise<string>((resolve, reject) => {
+        const fr = new FileReader();
+        fr.onload = () => resolve(String(fr.result));
+        fr.onerror = reject;
+        fr.readAsDataURL(f);
+      });
+    const slipImage = await fileToDataUrl(file);
+    return apiFetch<Payment>("/api/payments", {
+      method: "POST",
+      auth: true,
+      body: JSON.stringify({ booking: bookingId, slipImage, amount }),
+    });
+  },
+  getQR: async (pp: string, amount?: number) => {
+    const q = new URLSearchParams();
+    q.set("pp", pp);
+    if (amount !== undefined) q.set("amount", String(amount));
+    return apiFetch<{ payload: string; qrcodeDataUrl: string }>(
+      `/api/payments/qr?${q.toString()}`
+    );
   },
 };

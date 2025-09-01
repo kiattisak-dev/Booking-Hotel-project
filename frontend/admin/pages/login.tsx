@@ -32,12 +32,12 @@ export default function LoginPage() {
   const onSubmit = async (data: LoginForm) => {
     setLoading(true);
     try {
-      const res = await apiFetch<{ _id: string; email: string; role: string; token: string }>(
+      const res = await apiFetch<{ user: { _id: string; email: string; role: string }; token: string }>(
         '/api/auth/login',
         { method: 'POST', body: JSON.stringify(data) }
       );
-      setAuthCookies(res.token, res.role);
-      login({ id: res._id, email: res.email, firstName: '', lastName: '', role: res.role }, res.token);
+      setAuthCookies(res.token, res.user.role);
+      login({ id: res.user._id, email: res.user.email, firstName: '', lastName: '', role: res.user.role }, res.token);
       router.replace(redirect);
     } catch (e: any) {
       setError('root', { message: e?.message || 'Login failed' });
@@ -64,14 +64,14 @@ export default function LoginPage() {
               <div className="space-y-2">
                 <Label htmlFor="email">Email</Label>
                 <Input id="email" type="email" placeholder="admin@hotel.com" {...register('email')} />
-                {errors.email && <p className="text-sm text-red-600">{errors.email.message}</p>}
+                {errors.email?.message && <p className="text-sm text-red-600">{errors.email.message}</p>}
               </div>
               <div className="space-y-2">
                 <Label htmlFor="password">Password</Label>
                 <Input id="password" type="password" placeholder="Enter your password" {...register('password')} />
-                {errors.password && <p className="text-sm text-red-600">{errors.password.message}</p>}
+                {errors.password?.message && <p className="text-sm text-red-600">{errors.password.message}</p>}
               </div>
-              {errors.root && <p className="text-sm text-red-600">{errors.root.message}</p>}
+              {errors.root?.message && <p className="text-sm text-red-600">{errors.root.message}</p>}
               <Button type="submit" className="w-full" disabled={loading}>
                 {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 Sign In

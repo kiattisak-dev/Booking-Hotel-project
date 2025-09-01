@@ -1,8 +1,7 @@
 import express from "express";
 import dotenv from "dotenv";
-import cors from "cors";
+import { createCors } from "./configs/cors";
 import { errorHandler } from "./middleware/errorHandler";
-
 import authRoutes from "./routes/auth_routes";
 import userRoutes from "./routes/user_routes";
 import roomRoutes from "./routes/room_routes";
@@ -14,12 +13,15 @@ import { startSchedulers } from "./jobs/schedulers";
 
 dotenv.config();
 connectDB();
-startSchedulers(); 
+startSchedulers();
 
 const app = express();
 
-app.use(cors({ origin: process.env.CORS_ORIGIN || true, credentials: true }));
-app.use(express.json());
+app.use(createCors());
+
+const JSON_LIMIT = process.env.JSON_LIMIT || "20mb";
+app.use(express.json({ limit: JSON_LIMIT }));
+app.use(express.urlencoded({ extended: true, limit: JSON_LIMIT }));
 
 app.get("/", (_req, res) => res.send("Booking Hotel API running"));
 

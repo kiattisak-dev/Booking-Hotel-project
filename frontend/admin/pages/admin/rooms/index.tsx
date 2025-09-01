@@ -1,8 +1,7 @@
-// pages/admin/rooms/index.tsx
 import React, { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import Link from "next/link";
-import { Plus, Search, Edit } from "lucide-react";
+import { Plus, Search, Edit, Trash2 } from "lucide-react";
 import AdminLayout from "@/components/admin/AdminLayout";
 import AdminTable from "@/components/admin/AdminTable";
 import StatusBadge from "@/components/admin/StatusBadge";
@@ -28,14 +27,18 @@ type RoomTypeDoc = {
   bedType?: string;
   pricePerNight?: number;
   status?: "active" | "inactive";
+  images?: string[];
   rooms: {
     code: string;
     status?: "available" | "occupied" | "maintenance" | "inactive";
+    images?: string[];
   }[];
 };
 
+type RoomsResponse = { rooms: RoomTypeDoc[]; total: number };
+
 type Row = {
-  id: string; // `${typeId}:${roomCode}`
+  id: string;
   typeId: string;
   code: string;
   name: string;
@@ -43,8 +46,10 @@ type Row = {
   capacity: number;
   bedType: string;
   pricePerNight: number;
-  status: "active" | "inactive" | string; // type status
+  status: "active" | "inactive" | string;
   roomStatus?: "available" | "occupied" | "maintenance" | "inactive";
+  typeImages: string[];
+  roomImages: string[];
 };
 
 function RoomsPage() {
@@ -52,29 +57,28 @@ function RoomsPage() {
   const [typeFilter, setTypeFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
   const [data, setData] = useState<Row[]>([]);
-
   const [editOpen, setEditOpen] = useState(false);
   const [editing, setEditing] = useState<EditRoomInitial | null>(null);
   const [saving, setSaving] = useState(false);
 
   async function fetchData() {
-    const types = await apiFetch<RoomTypeDoc[]>("/api/rooms", { auth: true });
-    const flat: Row[] = (types || []).flatMap(
-      (
-        rt: RoomTypeDoc
-      ) =>
-        (rt.rooms || []).map((r) => ({
-          id: `${rt._id}:${r.code}`,
-          typeId: rt._id,
-          code: r.code,
-          name: `${rt.type} ${r.code}`,
-          type: rt.type,
-          capacity: rt.capacity ?? 0,
-          bedType: rt.bedType ?? "-",
-          pricePerNight: rt.pricePerNight ?? 0,
-          status: rt.status ?? "inactive",
-          roomStatus: r.status ?? "available",
-        }))
+    const res = await apiFetch<RoomsResponse>("/api/rooms", { auth: true });
+    const types: RoomTypeDoc[] = res.rooms || [];
+    const flat: Row[] = types.flatMap((rt: RoomTypeDoc) =>
+      (rt.rooms || []).map((r: RoomTypeDoc["rooms"][number]) => ({
+        id: `${rt._id}:${r.code}`,
+        typeId: rt._id,
+        code: r.code,
+        name: `${rt.type} ${r.code}`,
+        type: rt.type,
+        capacity: rt.capacity ?? 0,
+        bedType: rt.bedType ?? "-",
+        pricePerNight: rt.pricePerNight ?? 0,
+        status: rt.status ?? "inactive",
+        roomStatus: r.status ?? "available",
+        typeImages: Array.isArray(rt.images) ? rt.images : [],
+        roomImages: Array.isArray(r.images) ? r.images : [],
+      }))
     );
     setData(flat);
   }
@@ -106,6 +110,8 @@ function RoomsPage() {
       pricePerNight: row.pricePerNight,
       typeStatus: (row.status as "active" | "inactive") ?? "active",
       roomStatus: row.roomStatus ?? "available",
+      typeImages: row.typeImages,
+      roomImages: row.roomImages,
     });
     setEditOpen(true);
   };
@@ -116,18 +122,18 @@ function RoomsPage() {
     pricePerNight?: number;
     typeStatus?: "active" | "inactive";
     roomStatus?: "available" | "occupied" | "maintenance" | "inactive";
+    typeImages?: string[];
   }) => {
     if (!editing) return;
     setSaving(true);
     try {
-      // อัปเดต type-level
       const typePayload: any = {};
       if (vals.capacity !== undefined) typePayload.capacity = vals.capacity;
       if (vals.bedType !== undefined) typePayload.bedType = vals.bedType;
       if (vals.pricePerNight !== undefined)
         typePayload.pricePerNight = vals.pricePerNight;
       if (vals.typeStatus !== undefined) typePayload.status = vals.typeStatus;
-
+      if (vals.typeImages !== undefined) typePayload.images = vals.typeImages;
       if (Object.keys(typePayload).length) {
         await apiFetch(`/api/rooms/${editing.typeId}`, {
           method: "PATCH",
@@ -135,9 +141,8 @@ function RoomsPage() {
           body: JSON.stringify(typePayload),
         });
       }
-
-      // อัปเดต room-level (status)
       if (vals.roomStatus !== undefined) {
+        const roomPayload: any = { status: vals.roomStatus };
         await apiFetch(
           `/api/rooms/${editing.typeId}/rooms/${encodeURIComponent(
             editing.roomCode
@@ -145,17 +150,29 @@ function RoomsPage() {
           {
             method: "PUT",
             auth: true,
-            body: JSON.stringify({ status: vals.roomStatus }),
+            body: JSON.stringify(roomPayload),
           }
         );
       }
-
       await fetchData();
       setEditOpen(false);
       setEditing(null);
     } finally {
       setSaving(false);
     }
+  };
+
+  const handleDelete = async (row: Row) => {
+    const ok = window.confirm(`Delete room ${row.code} in type ${row.type}?`);
+    if (!ok) return;
+    await apiFetch(
+      `/api/rooms/${row.typeId}/rooms/${encodeURIComponent(row.code)}`,
+      {
+        method: "DELETE",
+        auth: true,
+      }
+    );
+    await fetchData();
   };
 
   const roomColumns = [
@@ -188,6 +205,14 @@ function RoomsPage() {
             <Edit className="mr-1 h-3 w-3" />
             Edit
           </Button>
+          <Button
+            variant="destructive"
+            size="sm"
+            onClick={() => handleDelete(row)}
+          >
+            <Trash2 className="mr-1 h-3 w-3" />
+            Delete
+          </Button>
           <Link href={`/admin/rooms/${row.id}`}>
             <Button variant="outline" size="sm">
               Detail
@@ -214,7 +239,6 @@ function RoomsPage() {
             </Button>
           </Link>
         </motion.div>
-
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -253,7 +277,6 @@ function RoomsPage() {
             </Select>
           </div>
         </motion.div>
-
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -261,7 +284,6 @@ function RoomsPage() {
         >
           <AdminTable columns={roomColumns} data={filtered} />
         </motion.div>
-
         <EditRoomDialog
           open={editOpen}
           onOpenChange={(v) => {

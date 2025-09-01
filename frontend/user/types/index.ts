@@ -22,10 +22,14 @@ export interface Package {
   validUntil: string;
 }
 
+export type UserRole = 'USER' | 'ADMIN';
+
 export interface User {
   id: string;
   email: string;
   name: string;
+  token?: string;      // เพิ่มสำหรับถือ JWT จาก /login
+  role?: UserRole;     // เผื่อ backend ส่ง role กลับมา
 }
 
 export interface Booking {

@@ -1,5 +1,4 @@
-// pages/admin/rooms/new.tsx
-import React from 'react';
+import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { useRouter } from 'next/router';
 import { useForm } from 'react-hook-form';
@@ -14,6 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { withAdminAuth } from '@/lib/auth-guards';
 import { apiFetch } from '@/lib/api';
+import ImagePicker from '@/components/admin/ImagePicker';
 
 const roomSchema = z.object({
   code: z.string().min(1, 'Room code is required'),
@@ -36,6 +36,8 @@ function NewRoomPage() {
     defaultValues: { status: 'active', capacity: 1, pricePerNight: 0 },
   });
 
+  const [typeImages, setTypeImages] = useState<string[]>([]);
+
   const onSubmit = async (data: RoomForm) => {
     const amenities = data.amenities ? data.amenities.split(',').map(s => s.trim()).filter(Boolean) : [];
     await apiFetch("/api/rooms", {
@@ -47,9 +49,9 @@ function NewRoomPage() {
         capacity: data.capacity,
         bedType: data.bedType,
         pricePerNight: data.pricePerNight,
-        images: [],
+        images: typeImages,
         status: data.status === 'active' ? 'active' : 'inactive',
-        rooms: [{ code: data.code, status: 'available', images: [] }],
+        rooms: [{ code: data.code, status: 'available' }],
         amenities
       })
     });
@@ -111,14 +113,16 @@ function NewRoomPage() {
 
                 <div className="space-y-2">
                   <Label htmlFor="description">Description</Label>
-                  <Textarea id="description" placeholder="Describe the room features and amenities..." rows={4} {...register('description')} />
+                  <Textarea id="description" rows={4} {...register('description')} />
                   {errors.description && <p className="text-sm text-red-600">{errors.description.message}</p>}
                 </div>
 
                 <div className="space-y-2">
                   <Label htmlFor="amenities">Amenities</Label>
-                  <Textarea id="amenities" placeholder="Enter amenities separated by commas (e.g., WiFi, TV, Mini Bar)" rows={3} {...register('amenities')} />
+                  <Textarea id="amenities" rows={3} {...register('amenities')} />
                 </div>
+
+                <ImagePicker label="Type Images" value={typeImages} onChange={setTypeImages} />
 
                 <div className="space-y-2">
                   <Label>Status</Label>

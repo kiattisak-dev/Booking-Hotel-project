@@ -2,32 +2,19 @@ import * as React from "react";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm, Controller, Resolver } from "react-hook-form";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import ImagePicker from "@/components/admin/ImagePicker";
 
 const schema = z.object({
   capacity: z.coerce.number().min(0).optional(),
   bedType: z.string().optional(),
   pricePerNight: z.coerce.number().min(0).optional(),
   typeStatus: z.enum(["active", "inactive"]).optional(),
-  roomStatus: z
-    .enum(["available", "occupied", "maintenance", "inactive"])
-    .optional(),
+  roomStatus: z.enum(["available", "occupied", "maintenance", "inactive"]).optional(),
 });
 
 export type EditRoomInitial = {
@@ -39,6 +26,8 @@ export type EditRoomInitial = {
   pricePerNight?: number;
   typeStatus?: "active" | "inactive";
   roomStatus?: "available" | "occupied" | "maintenance" | "inactive";
+  typeImages?: string[];
+  roomImages?: string[];
 };
 
 type FormValues = z.infer<typeof schema>;
@@ -47,27 +36,20 @@ type Props = {
   open: boolean;
   onOpenChange: (v: boolean) => void;
   initial: EditRoomInitial | null;
-  onSubmit: (vals: FormValues) => Promise<void>;
+  onSubmit: (vals: {
+    capacity?: number;
+    bedType?: string;
+    pricePerNight?: number;
+    typeStatus?: "active" | "inactive";
+    roomStatus?: "available" | "occupied" | "maintenance" | "inactive";
+    typeImages?: string[];
+  }) => Promise<void>;
   submitting?: boolean;
 };
 
-export default function EditRoomDialog({
-  open,
-  onOpenChange,
-  initial,
-  onSubmit,
-  submitting,
-}: Props) {
-  type FormValues = z.infer<typeof schema>;
-
+export default function EditRoomDialog({ open, onOpenChange, initial, onSubmit, submitting }: Props) {
   const resolver = zodResolver(schema) as Resolver<FormValues>;
-  const {
-    register,
-    handleSubmit,
-    reset,
-    control,
-    formState: { errors },
-  } = useForm<FormValues>({
+  const { register, handleSubmit, reset, control, formState: { errors } } = useForm<FormValues>({
     resolver,
     defaultValues: {
       capacity: initial?.capacity,
@@ -78,6 +60,8 @@ export default function EditRoomDialog({
     },
   });
 
+  const [typeImages, setTypeImages] = React.useState<string[]>(initial?.typeImages || []);
+
   React.useEffect(() => {
     reset({
       capacity: initial?.capacity,
@@ -86,50 +70,44 @@ export default function EditRoomDialog({
       typeStatus: initial?.typeStatus ?? "active",
       roomStatus: initial?.roomStatus ?? "available",
     });
+    setTypeImages(initial?.typeImages || []);
   }, [initial, reset]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent className="sm:max-w-2xl">
         <DialogHeader>
-          <DialogTitle>
-            Edit Room — {initial?.type} {initial?.roomCode}
-          </DialogTitle>
+          <DialogTitle>Edit Room — {initial?.type} {initial?.roomCode}</DialogTitle>
         </DialogHeader>
-
         <form
           onSubmit={handleSubmit(async (vals) => {
-            await onSubmit(vals);
+            await onSubmit({
+              capacity: vals.capacity,
+              bedType: vals.bedType,
+              pricePerNight: vals.pricePerNight,
+              typeStatus: vals.typeStatus,
+              roomStatus: vals.roomStatus,
+              typeImages,
+            });
           })}
-          className="space-y-4"
+          className="space-y-6"
         >
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>Capacity</Label>
               <Input type="number" step="1" {...register("capacity")} />
-              {errors.capacity && (
-                <p className="text-sm text-red-600">
-                  {errors.capacity.message}
-                </p>
-              )}
+              {errors.capacity && <p className="text-sm text-red-600">{errors.capacity.message}</p>}
             </div>
             <div className="space-y-2">
               <Label>Price / Night</Label>
               <Input type="number" step="0.01" {...register("pricePerNight")} />
-              {errors.pricePerNight && (
-                <p className="text-sm text-red-600">
-                  {errors.pricePerNight.message}
-                </p>
-              )}
+              {errors.pricePerNight && <p className="text-sm text-red-600">{errors.pricePerNight.message}</p>}
             </div>
           </div>
 
           <div className="space-y-2">
             <Label>Bed Type</Label>
-            <Input
-              placeholder="King / Twin / Double ..."
-              {...register("bedType")}
-            />
+            <Input placeholder="King / Twin / Double ..." {...register("bedType")} />
           </div>
 
           <div className="grid grid-cols-2 gap-4">
@@ -140,10 +118,7 @@ export default function EditRoomDialog({
                 control={control}
                 defaultValue={initial?.typeStatus ?? "active"}
                 render={({ field }) => (
-                  <Select
-                    value={field.value ?? "active"}
-                    onValueChange={field.onChange}
-                  >
+                  <Select value={field.value ?? "active"} onValueChange={field.onChange}>
                     <SelectTrigger>
                       <SelectValue placeholder="active" />
                     </SelectTrigger>
@@ -162,10 +137,7 @@ export default function EditRoomDialog({
                 control={control}
                 defaultValue={initial?.roomStatus ?? "available"}
                 render={({ field }) => (
-                  <Select
-                    value={field.value ?? "available"}
-                    onValueChange={field.onChange}
-                  >
+                  <Select value={field.value ?? "available"} onValueChange={field.onChange}>
                     <SelectTrigger>
                       <SelectValue placeholder="available" />
                     </SelectTrigger>
@@ -181,17 +153,11 @@ export default function EditRoomDialog({
             </div>
           </div>
 
+          <ImagePicker label="Type Images" value={typeImages} onChange={setTypeImages} />
+
           <DialogFooter>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => onOpenChange(false)}
-            >
-              Cancel
-            </Button>
-            <Button type="submit" disabled={!!submitting}>
-              Save
-            </Button>
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+            <Button type="submit" disabled={!!submitting}>Save</Button>
           </DialogFooter>
         </form>
       </DialogContent>
