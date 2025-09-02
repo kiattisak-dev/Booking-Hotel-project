@@ -14,7 +14,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Calendar, Users, MapPin, QrCode, Copy } from "lucide-react";
-import { roomAPI, bookingAPI, paymentAPI } from "@/lib/api";
+import { roomAPI, bookingAPI, paymentAPI, apiFetch } from "@/lib/api";
 import { useQuery } from "@tanstack/react-query";
 import { th } from "@/lib/i18n";
 import { toast } from "sonner";
@@ -35,6 +35,10 @@ export default function Checkout() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [step, setStep] = useState<1 | 2>(1);
 
+  const [selectedPackageId, setSelectedPackageId] = useState<string | null>(null);
+  const [discount, setDiscount] = useState<number>(0);
+  const [finalAmount, setFinalAmount] = useState<number>(0);
+
   const {
     register,
     handleSubmit,
@@ -47,11 +51,13 @@ export default function Checkout() {
 
   useEffect(() => {
     const stored = localStorage.getItem("pendingBooking");
+    const pkg = localStorage.getItem("selectedPackageId");
     if (stored) {
       setBookingData(JSON.parse(stored));
     } else {
       router.push("/rooms");
     }
+    if (pkg) setSelectedPackageId(pkg);
   }, []);
 
   const { data: room } = useQuery({
@@ -77,15 +83,50 @@ export default function Checkout() {
     return Number(nightlyPrice) * Number(calculateNights() || 0);
   }, [nightlyPrice, bookingData]);
 
+  useEffect(() => {
+    const calc = async () => {
+      if (!bookingData || !bookingData.roomId || !bookingData.checkIn || !bookingData.checkOut) {
+        setFinalAmount(total);
+        setDiscount(0);
+        return;
+      }
+      if (!selectedPackageId) {
+        setFinalAmount(total);
+        setDiscount(0);
+        return;
+      }
+      try {
+        const res = await apiFetch<{ total: number; discount: number; finalTotal: number }>(
+          "/api/packages/apply",
+          {
+            method: "POST",
+            body: JSON.stringify({
+              packageId: selectedPackageId,
+              roomTypeId: bookingData.roomId,
+              checkIn: bookingData.checkIn,
+              checkOut: bookingData.checkOut,
+            }),
+          }
+        );
+        setDiscount(Number(res.discount || 0));
+        setFinalAmount(Number(res.finalTotal || total));
+      } catch {
+        setDiscount(0);
+        setFinalAmount(total);
+      }
+    };
+    calc();
+  }, [selectedPackageId, bookingData?.roomId, bookingData?.checkIn, bookingData?.checkOut, total]);
+
   const [qrDataUrl, setQrDataUrl] = useState<string>("");
   const [qrPayload, setQrPayload] = useState<string>("");
   const PROMPTPAY_ID = process.env.NEXT_PUBLIC_PROMPTPAY_ID || "";
 
   useEffect(() => {
     const fetchQR = async () => {
-      if (step !== 2 || !PROMPTPAY_ID || !total) return;
+      if (step !== 2 || !PROMPTPAY_ID || !finalAmount) return;
       try {
-        const res = await paymentAPI.getQR(PROMPTPAY_ID, total);
+        const res = await paymentAPI.getQR(PROMPTPAY_ID, finalAmount);
         setQrPayload(res.payload || "");
         setQrDataUrl(res.qrcodeDataUrl || "");
       } catch (e: any) {
@@ -93,7 +134,7 @@ export default function Checkout() {
       }
     };
     fetchQR();
-  }, [step, PROMPTPAY_ID, total]);
+  }, [step, PROMPTPAY_ID, finalAmount]);
 
   const goNextToQR = async () => {
     const ok = await trigger();
@@ -102,7 +143,7 @@ export default function Checkout() {
       toast.error("ยังไม่ได้ตั้งค่าเลขพร้อมเพย์ (NEXT_PUBLIC_PROMPTPAY_ID)");
       return;
     }
-    if (!total) {
+    if (!finalAmount) {
       toast.error("ไม่สามารถคำนวณยอดชำระได้");
       return;
     }
@@ -129,12 +170,13 @@ export default function Checkout() {
 
       const bookingId = (booking as any).id ?? (booking as any)._id;
 
-      await paymentAPI.uploadSlip(paymentSlip, bookingId);
+      await paymentAPI.uploadSlip(paymentSlip, bookingId, finalAmount);
 
       localStorage.removeItem("pendingBooking");
+      localStorage.removeItem("selectedPackageId");
 
       router.push(`/booking/success?bookingId=${bookingId}`);
-    } catch (error) {
+    } catch {
       toast.error("เกิดข้อผิดพลาดในการจอง กรุณาลองใหม่อีกครั้ง");
     } finally {
       setIsSubmitting(false);
@@ -226,9 +268,15 @@ export default function Checkout() {
                           </span>
                           <span>฿{total.toLocaleString()}</span>
                         </div>
+                        {discount > 0 && (
+                          <div className="flex justify-between text-green-700">
+                            <span>ส่วนลดแพ็กเกจ</span>
+                            <span>-฿{discount.toLocaleString()}</span>
+                          </div>
+                        )}
                         <div className="flex justify-between font-semibold text-lg">
-                          <span>ยอดรวม</span>
-                          <span>฿{total.toLocaleString()}</span>
+                          <span>ยอดรวมชำระ</span>
+                          <span>฿{finalAmount.toLocaleString()}</span>
                         </div>
                       </div>
                     </div>
@@ -254,7 +302,7 @@ export default function Checkout() {
                             />
                             <div className="mt-3 text-sm text-gray-600">
                               พร้อมเพย์: {PROMPTPAY_ID} | จำนวนเงิน: ฿
-                              {total.toLocaleString()}
+                              {finalAmount.toLocaleString()}
                             </div>
                             {qrPayload && (
                               <button

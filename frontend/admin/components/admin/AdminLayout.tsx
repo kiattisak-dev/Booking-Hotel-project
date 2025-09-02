@@ -27,7 +27,6 @@ interface AdminLayoutProps {
 const navigation = [
   { name: "Dashboard", href: "/admin", icon: LayoutDashboard },
   { name: "Rooms", href: "/admin/rooms", icon: Bed },
-  { name: "Packages", href: "/admin/packages", icon: Package },
   { name: "Bookings", href: "/admin/bookings", icon: Calendar },
   { name: "Payments", href: "/admin/payments", icon: CreditCard },
 ];
@@ -158,13 +157,13 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
                       title={item.name}
                       className={cn(
                         "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
+                        "no-underline hover:no-underline focus:no-underline active:no-underline",
                         isActive
                           ? "bg-blue-50 text-blue-700"
                           : "text-gray-700 hover:bg-gray-50 hover:text-gray-900"
                       )}
                     >
                       <item.icon className="h-5 w-5 flex-shrink-0" />
-
                       <motion.span
                         initial={false}
                         animate={{
@@ -227,7 +226,10 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
                 variant="ghost"
                 size="sm"
                 onClick={handleLogout}
-                className="w-full justify-start gap-2 text-gray-700"
+                className={cn(
+                  "w-full justify-start gap-2 text-gray-700",
+                  "no-underline hover:no-underline focus:no-underline active:no-underline"
+                )}
               >
                 <LogOut className="h-4 w-4" />
                 <span className={cn(isDesktop && !sidebarOpen && "hidden")}>

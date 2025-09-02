@@ -1,7 +1,9 @@
+// pages/admin/rooms/index.tsx
 import React, { useEffect, useMemo, useState } from "react";
-import { motion } from "framer-motion";
 import Link from "next/link";
+import { motion } from "framer-motion";
 import { Plus, Search, Edit, Trash2 } from "lucide-react";
+
 import AdminLayout from "@/components/admin/AdminLayout";
 import AdminTable from "@/components/admin/AdminTable";
 import StatusBadge from "@/components/admin/StatusBadge";
@@ -14,6 +16,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+
 import { withAdminAuth } from "@/lib/auth-guards";
 import { apiFetch } from "@/lib/api";
 import EditRoomDialog, {
@@ -23,6 +32,7 @@ import EditRoomDialog, {
 type RoomTypeDoc = {
   _id: string;
   type: string;
+  description?: string;
   capacity?: number;
   bedType?: string;
   pricePerNight?: number;
@@ -56,16 +66,32 @@ function RoomsPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [typeFilter, setTypeFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
+
   const [data, setData] = useState<Row[]>([]);
+  const [typesList, setTypesList] = useState<RoomTypeDoc[]>([]);
+
   const [editOpen, setEditOpen] = useState(false);
   const [editing, setEditing] = useState<EditRoomInitial | null>(null);
   const [saving, setSaving] = useState(false);
 
+  // Add rooms dialog states (Single / Bulk)
+  const [addOpen, setAddOpen] = useState(false);
+  const [addMode, setAddMode] = useState<"single" | "bulk">("single");
+  const [addTypeId, setAddTypeId] = useState<string>("");
+  const [addPrefix, setAddPrefix] = useState<string>("");
+  const [addCount, setAddCount] = useState<number>(1);
+  const [addSaving, setAddSaving] = useState(false);
+
   async function fetchData() {
     const res = await apiFetch<RoomsResponse>("/api/rooms", { auth: true });
     const types: RoomTypeDoc[] = res.rooms || [];
-    const flat: Row[] = types.flatMap((rt: RoomTypeDoc) =>
-      (rt.rooms || []).map((r: RoomTypeDoc["rooms"][number]) => ({
+
+    // เก็บรายการ Room Type ไว้ใช้กับ Select (ให้มีแม้ type ที่ยังไม่มีห้อง)
+    setTypesList(types);
+
+    // flat ออกมาเป็นรายการห้อง
+    const flat: Row[] = types.flatMap((rt) =>
+      (rt.rooms || []).map((r) => ({
         id: `${rt._id}:${r.code}`,
         typeId: rt._id,
         code: r.code,
@@ -134,6 +160,7 @@ function RoomsPage() {
         typePayload.pricePerNight = vals.pricePerNight;
       if (vals.typeStatus !== undefined) typePayload.status = vals.typeStatus;
       if (vals.typeImages !== undefined) typePayload.images = vals.typeImages;
+
       if (Object.keys(typePayload).length) {
         await apiFetch(`/api/rooms/${editing.typeId}`, {
           method: "PATCH",
@@ -141,6 +168,7 @@ function RoomsPage() {
           body: JSON.stringify(typePayload),
         });
       }
+
       if (vals.roomStatus !== undefined) {
         const roomPayload: any = { status: vals.roomStatus };
         await apiFetch(
@@ -154,6 +182,7 @@ function RoomsPage() {
           }
         );
       }
+
       await fetchData();
       setEditOpen(false);
       setEditing(null);
@@ -213,15 +242,49 @@ function RoomsPage() {
             <Trash2 className="mr-1 h-3 w-3" />
             Delete
           </Button>
-          <Link href={`/admin/rooms/${row.id}`}>
-            <Button variant="outline" size="sm">
-              Detail
-            </Button>
-          </Link>
         </div>
       ),
     },
   ];
+
+  const handleAddRooms = async () => {
+    if (!addTypeId) {
+      alert("กรุณาเลือก Room Type");
+      return;
+    }
+    if (!addPrefix) {
+      alert("กรุณากรอก Prefix");
+      return;
+    }
+    const count = addMode === "single" ? 1 : Number(addCount || 0);
+    if (!count || count < 1) {
+      alert("จำนวนห้องต้องมากกว่า 0");
+      return;
+    }
+
+    setAddSaving(true);
+    try {
+      await apiFetch(`/api/rooms/${addTypeId}/rooms`, {
+        method: "POST",
+        auth: true,
+        body: JSON.stringify({ prefix: addPrefix, count }),
+      });
+      await fetchData();
+      setAddOpen(false);
+      setAddTypeId("");
+      setAddPrefix("");
+      setAddCount(1);
+      setAddMode("single");
+    } finally {
+      setAddSaving(false);
+    }
+  };
+
+  // ใช้ typesList เพื่อสร้างรายการตัวกรอง "by type" ให้เสถียรกว่า
+  const filterTypeOptions = useMemo(() => {
+    const set = new Set(typesList.map((t) => t.type));
+    return ["all", ...Array.from(set)];
+  }, [typesList]);
 
   return (
     <AdminLayout>
@@ -232,13 +295,19 @@ function RoomsPage() {
           className="flex items-center justify-between"
         >
           <h1 className="text-3xl font-bold text-gray-900">Rooms</h1>
-          <Link href="/admin/rooms/new">
-            <Button>
-              <Plus className="mr-2 h-4 w-4" />
-              Add Room
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={() => setAddOpen(true)}>
+              + Add Rooms
             </Button>
-          </Link>
+            <Link href="/admin/rooms/new">
+              <Button>
+                <Plus className="mr-2 h-4 w-4" />
+                Add Room Type
+              </Button>
+            </Link>
+          </div>
         </motion.div>
+
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -254,17 +323,21 @@ function RoomsPage() {
                 className="pl-9"
               />
             </div>
+
+            {/* filter by type (มาจาก typesList) */}
             <Select value={typeFilter} onValueChange={setTypeFilter}>
               <SelectTrigger className="w-48">
                 <SelectValue placeholder="Filter by type" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Types</SelectItem>
-                <SelectItem value="Standard">Standard</SelectItem>
-                <SelectItem value="Deluxe">Deluxe</SelectItem>
-                <SelectItem value="Suite">Suite</SelectItem>
+                {filterTypeOptions.map((opt) => (
+                  <SelectItem key={opt} value={opt}>
+                    {opt === "all" ? "All Types" : opt}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
+
             <Select value={statusFilter} onValueChange={setStatusFilter}>
               <SelectTrigger className="w-48">
                 <SelectValue placeholder="Filter by status" />
@@ -277,6 +350,7 @@ function RoomsPage() {
             </Select>
           </div>
         </motion.div>
+
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -284,6 +358,8 @@ function RoomsPage() {
         >
           <AdminTable columns={roomColumns} data={filtered} />
         </motion.div>
+
+        {/* Edit room dialog */}
         <EditRoomDialog
           open={editOpen}
           onOpenChange={(v) => {
@@ -296,6 +372,89 @@ function RoomsPage() {
             await saveEdit(vals);
           }}
         />
+
+        {/* Add Rooms Dialog (Single/Bulk) */}
+        <Dialog open={addOpen} onOpenChange={setAddOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Add Rooms</DialogTitle>
+            </DialogHeader>
+
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Mode</label>
+                <Select
+                  value={addMode}
+                  onValueChange={(v) => setAddMode(v as "single" | "bulk")}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select mode" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="single">Single (1 room)</SelectItem>
+                    <SelectItem value="bulk">Bulk (multiple rooms)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Room Type</label>
+                <Select value={addTypeId} onValueChange={setAddTypeId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select room type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {typesList.map((t) => (
+                      <SelectItem key={t._id} value={t._id}>
+                        {t.type}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Prefix</label>
+                  <Input
+                    placeholder="เช่น D"
+                    value={addPrefix}
+                    onChange={(e) => setAddPrefix(e.target.value)}
+                  />
+                </div>
+
+                {addMode === "bulk" && (
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Count</label>
+                    <Input
+                      type="number"
+                      min={1}
+                      value={addCount}
+                      onChange={(e) => setAddCount(Number(e.target.value))}
+                    />
+                  </div>
+                )}
+              </div>
+
+              <p className="text-xs text-gray-500">
+                ระบบจะสร้างรหัสห้องเป็นลำดับอัตโนมัติ เช่น D001, D002, ...
+              </p>
+            </div>
+
+            <div className="flex justify-end gap-2 pt-4">
+              <Button variant="outline" onClick={() => setAddOpen(false)}>
+                Cancel
+              </Button>
+              <Button onClick={handleAddRooms} disabled={addSaving}>
+                {addSaving
+                  ? "Saving..."
+                  : addMode === "single"
+                  ? "Add 1 Room"
+                  : "Add Rooms"}
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
     </AdminLayout>
   );

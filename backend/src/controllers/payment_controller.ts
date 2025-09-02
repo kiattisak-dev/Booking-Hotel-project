@@ -3,6 +3,7 @@ import PaymentSlip from "../models/PaymentSlip";
 import Booking from "../models/Booking";
 import generatePayload from "promptpay-qr";
 import QRCode from "qrcode";
+import RoomType from "../models/RoomType";
 
 export const getSlips = async (_req: Request, res: Response) => {
   const slips = await PaymentSlip.find().populate({
@@ -63,14 +64,43 @@ export const updateSlip = async (req: Request, res: Response) => {
       const b = await Booking.findById(slip.booking);
       if (b) {
         if (slip.status === "APPROVED") {
-          b.paymentStatus = "PAID";       
-          if (b.status !== "CONFIRMED") { 
-            b.status = "CONFIRMED";
+          b.paymentStatus = "PAID";
+          if (b.status !== "CONFIRMED") b.status = "CONFIRMED";
+
+          const rt = await RoomType.findById(b.roomTypeId);
+          if (rt) {
+            if (!b.roomCode) {
+              const avail = rt.rooms.find(
+                (r: any) => (r.status ?? "available") === "available"
+              );
+              if (avail) {
+                b.roomCode = avail.code;
+              }
+            }
+            if (b.roomCode) {
+              const room = rt.rooms.find((r: any) => r.code === b.roomCode);
+              if (room) {
+                room.status = "occupied";
+                await rt.save();
+              }
+            }
           }
         }
+
         if (slip.status === "REJECTED") {
-          b.paymentStatus = "PENDING";   
+          b.paymentStatus = "PENDING";
+          if (b.roomCode) {
+            const rt = await RoomType.findById(b.roomTypeId);
+            if (rt) {
+              const room = rt.rooms.find((r: any) => r.code === b.roomCode);
+              if (room) {
+                room.status = "available";
+                await rt.save();
+              }
+            }
+          }
         }
+
         await b.save();
       }
     }

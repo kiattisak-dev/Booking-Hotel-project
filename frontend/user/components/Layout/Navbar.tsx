@@ -26,14 +26,14 @@ export default function Navbar() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between h-16">
           <div className="flex items-center">
-            <Link href="/" className="flex items-center space-x-2">
+            <Link href="/" className="flex items-center space-x-2 no-underline hover:no-underline">
               <Hotel className="h-8 w-8 text-primary" />
               <span className="text-xl font-bold text-primary">Hotel Service Booking</span>
             </Link>
           </div>
 
           <div className="flex items-center space-x-4">
-            <Link href="/rooms">
+            <Link href="/rooms" className="no-underline hover:no-underline">
               <Button variant="ghost">{th.rooms}</Button>
             </Link>
 
@@ -47,7 +47,7 @@ export default function Navbar() {
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
                   <DropdownMenuItem asChild>
-                    <Link href="/account/reservations">
+                    <Link href="/account/reservations" className="w-full no-underline hover:no-underline">
                       {th.myReservations}
                     </Link>
                   </DropdownMenuItem>
@@ -59,10 +59,10 @@ export default function Navbar() {
               </DropdownMenu>
             ) : (
               <div className="flex items-center space-x-2">
-                <Link href="/login">
+                <Link href="/login" className="no-underline hover:no-underline">
                   <Button variant="ghost">{th.login}</Button>
                 </Link>
-                <Link href="/register">
+                <Link href="/register" className="no-underline hover:no-underline">
                   <Button>{th.register}</Button>
                 </Link>
               </div>

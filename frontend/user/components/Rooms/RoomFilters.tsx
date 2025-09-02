@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -21,29 +21,58 @@ interface RoomFiltersProps {
 
 const amenitiesList = ['WiFi', 'แอร์', 'ทีวี', 'ตู้เย็น', 'ระเบียง', 'วิวทะเล'];
 
+function sanitize(filters: SearchFilters): SearchFilters {
+  const out: SearchFilters = {};
+  if (filters.checkIn) out.checkIn = filters.checkIn;
+  if (filters.checkOut) out.checkOut = filters.checkOut;
+  if (typeof filters.guests === 'number' && Number.isFinite(filters.guests) && filters.guests > 0) {
+    out.guests = filters.guests;
+  }
+  if (typeof filters.minPrice === 'number' && Number.isFinite(filters.minPrice)) {
+    out.minPrice = filters.minPrice;
+  }
+  if (typeof filters.maxPrice === 'number' && Number.isFinite(filters.maxPrice)) {
+    out.maxPrice = filters.maxPrice;
+  }
+  if (filters.roomType) out.roomType = filters.roomType;
+  if (Array.isArray(filters.amenities) && filters.amenities.length > 0) {
+    out.amenities = filters.amenities;
+  }
+  return out;
+}
+
 export default function RoomFilters({ filters, onFiltersChange }: RoomFiltersProps) {
-  const [localFilters, setLocalFilters] = useState(filters);
+  const [localFilters, setLocalFilters] = useState<SearchFilters>(filters);
+
+  useEffect(() => {
+    setLocalFilters(filters);
+  }, [filters]);
 
   const handleApplyFilters = () => {
-    onFiltersChange(localFilters);
+    onFiltersChange(sanitize(localFilters));
   };
 
   const handleClearFilters = () => {
-    const emptyFilters = {};
-    setLocalFilters(emptyFilters);
-    onFiltersChange(emptyFilters);
+    const empty: SearchFilters = {};
+    setLocalFilters(empty);
+    onFiltersChange(empty);
   };
 
   const handleAmenityChange = (amenity: string, checked: boolean) => {
-    const currentAmenities = localFilters.amenities || [];
-    const newAmenities = checked
-      ? [...currentAmenities, amenity]
-      : currentAmenities.filter(a => a !== amenity);
+    const current = localFilters.amenities || [];
+    const next = checked ? Array.from(new Set([...current, amenity])) : current.filter(a => a !== amenity);
+    setLocalFilters({ ...localFilters, amenities: next });
+  };
 
-    setLocalFilters({
-      ...localFilters,
-      amenities: newAmenities,
-    });
+  const setNumber = (key: 'guests' | 'minPrice' | 'maxPrice') => (v: string) => {
+    if (v === '' || v === undefined) {
+      const next = { ...localFilters };
+      delete (next as any)[key];
+      setLocalFilters(next);
+      return;
+    }
+    const n = Number(v);
+    setLocalFilters({ ...localFilters, [key]: Number.isFinite(n) ? n : undefined });
   };
 
   return (
@@ -58,7 +87,8 @@ export default function RoomFilters({ filters, onFiltersChange }: RoomFiltersPro
             <Input
               type="date"
               value={localFilters.checkIn || ''}
-              onChange={(e) => setLocalFilters({ ...localFilters, checkIn: e.target.value })}
+              onChange={(e) => setLocalFilters({ ...localFilters, checkIn: e.target.value || undefined })}
+              min={new Date().toISOString().split('T')[0]}
             />
           </div>
 
@@ -67,15 +97,16 @@ export default function RoomFilters({ filters, onFiltersChange }: RoomFiltersPro
             <Input
               type="date"
               value={localFilters.checkOut || ''}
-              onChange={(e) => setLocalFilters({ ...localFilters, checkOut: e.target.value })}
+              onChange={(e) => setLocalFilters({ ...localFilters, checkOut: e.target.value || undefined })}
+              min={localFilters.checkIn || new Date().toISOString().split('T')[0]}
             />
           </div>
 
           <div>
             <Label>{th.numberOfGuests}</Label>
             <Select
-              value={localFilters.guests?.toString()}
-              onValueChange={(value) => setLocalFilters({ ...localFilters, guests: parseInt(value) })}
+              value={localFilters.guests?.toString() || ''}
+              onValueChange={(value) => setNumber('guests')(value)}
             >
               <SelectTrigger>
                 <SelectValue placeholder="เลือกจำนวนแขก" />
@@ -92,8 +123,10 @@ export default function RoomFilters({ filters, onFiltersChange }: RoomFiltersPro
           <div>
             <Label>{th.roomType}</Label>
             <Select
-              value={localFilters.roomType}
-              onValueChange={(value) => setLocalFilters({ ...localFilters, roomType: value as RoomType })}
+              value={localFilters.roomType || ''}
+              onValueChange={(value) =>
+                setLocalFilters({ ...localFilters, roomType: (value as RoomType) || undefined })
+              }
             >
               <SelectTrigger>
                 <SelectValue placeholder="เลือกประเภทห้อง" />
@@ -113,8 +146,9 @@ export default function RoomFilters({ filters, onFiltersChange }: RoomFiltersPro
               <Input
                 type="number"
                 placeholder="0"
-                value={localFilters.minPrice || ''}
-                onChange={(e) => setLocalFilters({ ...localFilters, minPrice: parseInt(e.target.value) })}
+                value={localFilters.minPrice ?? ''}
+                onChange={(e) => setNumber('minPrice')(e.target.value)}
+                min={0}
               />
             </div>
             <div>
@@ -122,8 +156,9 @@ export default function RoomFilters({ filters, onFiltersChange }: RoomFiltersPro
               <Input
                 type="number"
                 placeholder="10000"
-                value={localFilters.maxPrice || ''}
-                onChange={(e) => setLocalFilters({ ...localFilters, maxPrice: parseInt(e.target.value) })}
+                value={localFilters.maxPrice ?? ''}
+                onChange={(e) => setNumber('maxPrice')(e.target.value)}
+                min={0}
               />
             </div>
           </div>

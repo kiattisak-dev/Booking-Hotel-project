@@ -104,9 +104,12 @@ export const getMyBookings = async (req: Request, res: Response) => {
       Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24))
     );
     const price = Number(rt.pricePerNight ?? 0);
-    const totalAmount = price * nights;
-
     const latest = latestSlipByBooking.get(String(b._id));
+    const computed = price * nights;
+    const totalAmount = Number.isFinite(Number(latest?.amount))
+      ? Number(latest.amount)
+      : computed;
+
     let uiStatus: string = "PENDING_PAYMENT";
     if (b.status === "CANCELLED") {
       uiStatus = "CANCELLED";
@@ -132,4 +135,3 @@ export const getMyBookings = async (req: Request, res: Response) => {
 
   res.json(out);
 };
-
