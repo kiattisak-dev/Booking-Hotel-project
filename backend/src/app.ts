@@ -10,13 +10,13 @@ import paymentRoutes from "./routes/payment_routes";
 import { connectDB } from "./configs/db";
 import { startSchedulers } from "./jobs/schedulers";
 
-dotenv.config();
-connectDB();
-startSchedulers();
-
 const app = express();
 
-app.use(createCors());
+app.set("trust proxy", 1);
+
+const corsMw = createCors();
+app.use(corsMw);
+app.options("*", corsMw);
 
 const JSON_LIMIT = process.env.JSON_LIMIT || "20mb";
 app.use(express.json({ limit: JSON_LIMIT }));
