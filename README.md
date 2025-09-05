@@ -28,3 +28,9 @@ Supports **Admin** and **User** roles with JWT authentication and role-based acc
 - View personal bookings  
 
 ---
+
+## 🌐 Live Demo
+- **Admin Dashboard** → [booking-hotel-admin-six.vercel.app](https://booking-hotel-admin-six.vercel.app/)  
+- **User Portal** → [booking-hotel-user.vercel.app](https://booking-hotel-user.vercel.app/)
+
+---
