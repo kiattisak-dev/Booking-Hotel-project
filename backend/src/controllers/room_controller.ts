@@ -85,11 +85,38 @@ export const updateRoom = async (req: Request, res: Response) => {
 
 export const updateRoomType = async (req: Request, res: Response) => {
   const { typeId } = req.params;
-  const payload = req.body;
-  const updated = await RoomType.findByIdAndUpdate(typeId, payload, {
-    new: true,
-  });
-  if (!updated) return res.status(404).json({ message: "RoomType not found" });
+
+  const {
+    type,
+    description,
+    capacity,
+    bedType,
+    pricePerNight,
+    amenities,
+    images,
+    status,
+  } = req.body;
+
+  const payload: any = {};
+
+  if (type !== undefined) payload.type = type;
+  if (description !== undefined) payload.description = description;
+  if (capacity !== undefined) payload.capacity = capacity;
+  if (bedType !== undefined) payload.bedType = bedType;
+  if (pricePerNight !== undefined) payload.pricePerNight = pricePerNight;
+  if (amenities !== undefined) payload.amenities = amenities;
+  if (images !== undefined) payload.images = images;
+  if (status !== undefined) payload.status = status;
+
+  const updated = await RoomType.findByIdAndUpdate(
+    typeId,
+    { $set: payload },
+    { new: true, runValidators: true }
+  );
+
+  if (!updated)
+    return res.status(404).json({ message: "RoomType not found" });
+
   res.json(updated);
 };
 

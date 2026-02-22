@@ -54,6 +54,7 @@ type Row = {
   name: string;
   type: string;
   capacity: number;
+  description?: string;
   bedType: string;
   pricePerNight: number;
   status: "active" | "inactive" | string;
@@ -99,6 +100,7 @@ function RoomsPage() {
         type: rt.type,
         capacity: rt.capacity ?? 0,
         bedType: rt.bedType ?? "-",
+        description: rt.description ?? "",
         pricePerNight: rt.pricePerNight ?? 0,
         status: rt.status ?? "inactive",
         roomStatus: r.status ?? "available",
@@ -110,7 +112,7 @@ function RoomsPage() {
   }
 
   useEffect(() => {
-    fetchData().catch(() => {});
+    fetchData().catch(() => { });
   }, []);
 
   const filtered = useMemo(() => {
@@ -133,6 +135,7 @@ function RoomsPage() {
       type: row.type,
       capacity: row.capacity,
       bedType: row.bedType,
+      description: row.description,
       pricePerNight: row.pricePerNight,
       typeStatus: (row.status as "active" | "inactive") ?? "active",
       roomStatus: row.roomStatus ?? "available",
@@ -146,6 +149,7 @@ function RoomsPage() {
     capacity?: number;
     bedType?: string;
     pricePerNight?: number;
+    description?: string;
     typeStatus?: "active" | "inactive";
     roomStatus?: "available" | "occupied" | "maintenance" | "inactive";
     typeImages?: string[];
@@ -158,7 +162,10 @@ function RoomsPage() {
       if (vals.bedType !== undefined) typePayload.bedType = vals.bedType;
       if (vals.pricePerNight !== undefined)
         typePayload.pricePerNight = vals.pricePerNight;
-      if (vals.typeStatus !== undefined) typePayload.status = vals.typeStatus;
+      if (vals.description !== undefined)
+        typePayload.description = vals.description;
+      if (vals.description !== undefined)
+        if (vals.typeStatus !== undefined) typePayload.status = vals.typeStatus;
       if (vals.typeImages !== undefined) typePayload.images = vals.typeImages;
 
       if (Object.keys(typePayload).length) {
@@ -449,8 +456,8 @@ function RoomsPage() {
                 {addSaving
                   ? "Saving..."
                   : addMode === "single"
-                  ? "Add 1 Room"
-                  : "Add Rooms"}
+                    ? "Add 1 Room"
+                    : "Add Rooms"}
               </Button>
             </div>
           </DialogContent>

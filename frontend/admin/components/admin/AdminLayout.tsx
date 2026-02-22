@@ -31,16 +31,18 @@ const navigation = [
   { name: "Payments", href: "/admin/payments", icon: CreditCard },
 ];
 
-// breakpoint lg
+/* ---------- FIX 1: media query must NOT start null ---------- */
 function useIsDesktop() {
   const [isDesktop, setIsDesktop] = useState(false);
+
   useEffect(() => {
     const mq = window.matchMedia("(min-width: 1024px)");
     const update = () => setIsDesktop(mq.matches);
     update();
-    mq.addEventListener?.("change", update);
-    return () => mq.removeEventListener?.("change", update);
+    mq.addEventListener("change", update);
+    return () => mq.removeEventListener("change", update);
   }, []);
+
   return isDesktop;
 }
 
@@ -51,13 +53,24 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
   const { sidebarOpen, setSidebarOpen, toggleSidebar } = useUIStore();
   const { user, logout } = useAuthStore();
 
+  const DESKTOP_OPEN = 256;
+  const DESKTOP_COLLAPSED = 64;
+
+  /* ---------- FIX 2: sync sidebar when breakpoint changes ---------- */
+  useEffect(() => {
+    if (isDesktop) {
+      // ensure sidebar always visible on desktop
+      setSidebarOpen(true);
+    } else {
+      // mobile default closed
+      setSidebarOpen(false);
+    }
+  }, [isDesktop]);
+
   const handleLogout = () => {
     logout();
     router.push("/");
   };
-
-  const DESKTOP_OPEN = 256; // 16rem
-  const DESKTOP_COLLAPSED = 64; // 4rem
 
   return (
     <div className="flex h-screen bg-gray-50">
@@ -65,6 +78,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
       <AnimatePresence>
         {!isDesktop && sidebarOpen && (
           <motion.div
+            key="overlay"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
@@ -83,8 +97,14 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
           initial={false}
           animate={
             isDesktop
-              ? { width: sidebarOpen ? DESKTOP_OPEN : DESKTOP_COLLAPSED }
-              : { x: sidebarOpen ? 0 : -280, width: DESKTOP_OPEN }
+              ? {
+                  width: sidebarOpen ? DESKTOP_OPEN : DESKTOP_COLLAPSED,
+                  x: 0, // 🔥 prevent slide on desktop
+                }
+              : {
+                  x: sidebarOpen ? 0 : -DESKTOP_OPEN,
+                  width: DESKTOP_OPEN,
+                }
           }
           transition={{ type: "spring", stiffness: 260, damping: 28 }}
           className={cn(
@@ -93,30 +113,19 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
             "flex flex-col",
             isDesktop ? "" : "w-64"
           )}
-          style={isDesktop ? undefined : { width: DESKTOP_OPEN }}
         >
+          {/* collapse button desktop */}
           <div className="absolute right-[-12px] top-4 hidden lg:block">
             <motion.button
               whileTap={{ scale: 0.95 }}
               onClick={toggleSidebar}
               className="rounded-full bg-white border shadow-soft p-1.5"
-              aria-label="Toggle sidebar"
-              title="Toggle sidebar"
             >
-              <motion.span
-                key={String(sidebarOpen)}
-                initial={{ rotate: 0, opacity: 0 }}
-                animate={{ rotate: 0, opacity: 1 }}
-                exit={{ opacity: 0 }}
-                transition={{ duration: 0.15 }}
-                className="block"
-              >
-                {sidebarOpen ? (
-                  <ChevronLeft className="h-5 w-5" />
-                ) : (
-                  <ChevronRight className="h-5 w-5" />
-                )}
-              </motion.span>
+              {sidebarOpen ? (
+                <ChevronLeft className="h-5 w-5" />
+              ) : (
+                <ChevronRight className="h-5 w-5" />
+              )}
             </motion.button>
           </div>
 
@@ -157,7 +166,6 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
                       title={item.name}
                       className={cn(
                         "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
-                        "no-underline hover:no-underline focus:no-underline active:no-underline",
                         isActive
                           ? "bg-blue-50 text-blue-700"
                           : "text-gray-700 hover:bg-gray-50 hover:text-gray-900"
@@ -226,10 +234,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
                 variant="ghost"
                 size="sm"
                 onClick={handleLogout}
-                className={cn(
-                  "w-full justify-start gap-2 text-gray-700",
-                  "no-underline hover:no-underline focus:no-underline active:no-underline"
-                )}
+                className="w-full justify-start gap-2 text-gray-700"
               >
                 <LogOut className="h-4 w-4" />
                 <span className={cn(isDesktop && !sidebarOpen && "hidden")}>
@@ -243,7 +248,6 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
 
       {/* Main content */}
       <div className="flex flex-1 flex-col overflow-hidden">
-        {/* Top bar */}
         <header className="bg-white shadow-sm">
           <div className="flex h-16 items-center justify-between px-6">
             <Button
@@ -255,20 +259,17 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
               <Menu className="h-5 w-5" />
             </Button>
 
-            <div className="flex items-center gap-4">
-              <div className="text-sm text-gray-500">
-                {new Date().toLocaleDateString("en-US", {
-                  weekday: "long",
-                  year: "numeric",
-                  month: "long",
-                  day: "numeric",
-                })}
-              </div>
+            <div className="text-sm text-gray-500">
+              {new Date().toLocaleDateString("en-US", {
+                weekday: "long",
+                year: "numeric",
+                month: "long",
+                day: "numeric",
+              })}
             </div>
           </div>
         </header>
 
-        {/* Page content */}
         <main className="flex-1 overflow-auto">
           <motion.div
             key={router.pathname}
