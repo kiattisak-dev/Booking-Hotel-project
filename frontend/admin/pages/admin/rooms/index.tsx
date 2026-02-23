@@ -1,8 +1,8 @@
 // pages/admin/rooms/index.tsx
 import React, { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { motion } from "framer-motion";
-import { Plus, Search, Edit, Trash2 } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+import { Plus, Edit, Trash2 } from "lucide-react";
 
 import AdminLayout from "@/components/admin/AdminLayout";
 import AdminTable from "@/components/admin/AdminTable";
@@ -10,24 +10,20 @@ import StatusBadge from "@/components/admin/StatusBadge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
+  Select, SelectContent, SelectItem,
+  SelectTrigger, SelectValue,
 } from "@/components/ui/select";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 
 import { withAdminAuth } from "@/lib/auth-guards";
 import { apiFetch } from "@/lib/api";
 import EditRoomDialog, {
   EditRoomInitial,
 } from "@/components/admin/EditRoomDialog";
+
+/* -------------------------------------------------------------------------- */
+/* TYPES */
+/* -------------------------------------------------------------------------- */
 
 type RoomTypeDoc = {
   _id: string;
@@ -64,33 +60,35 @@ type Row = {
 };
 
 function RoomsPage() {
-  const [searchTerm, setSearchTerm] = useState("");
-  const [typeFilter, setTypeFilter] = useState("all");
-  const [statusFilter, setStatusFilter] = useState("all");
-
   const [data, setData] = useState<Row[]>([]);
   const [typesList, setTypesList] = useState<RoomTypeDoc[]>([]);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [typeFilter, setTypeFilter] = useState("all");
 
   const [editOpen, setEditOpen] = useState(false);
   const [editing, setEditing] = useState<EditRoomInitial | null>(null);
   const [saving, setSaving] = useState(false);
 
-  // Add rooms dialog states (Single / Bulk)
-  const [addOpen, setAddOpen] = useState(false);
-  const [addMode, setAddMode] = useState<"single" | "bulk">("single");
-  const [addTypeId, setAddTypeId] = useState<string>("");
-  const [addPrefix, setAddPrefix] = useState<string>("");
-  const [addCount, setAddCount] = useState<number>(1);
-  const [addSaving, setAddSaving] = useState(false);
+  const [successMsg, setSuccessMsg] = useState<string | null>(null);
+
+  /* -------------------------------------------------------------------------- */
+  /* SUCCESS ALERT */
+  /* -------------------------------------------------------------------------- */
+
+  const showSuccess = (msg: string) => {
+    setSuccessMsg(msg);
+    setTimeout(() => setSuccessMsg(null), 3000);
+  };
+
+  /* -------------------------------------------------------------------------- */
+  /* FETCH */
+  /* -------------------------------------------------------------------------- */
 
   async function fetchData() {
     const res = await apiFetch<RoomsResponse>("/api/rooms", { auth: true });
     const types: RoomTypeDoc[] = res.rooms || [];
-
-    // เก็บรายการ Room Type ไว้ใช้กับ Select (ให้มีแม้ type ที่ยังไม่มีห้อง)
     setTypesList(types);
 
-    // flat ออกมาเป็นรายการห้อง
     const flat: Row[] = types.flatMap((rt) =>
       (rt.rooms || []).map((r) => ({
         id: `${rt._id}:${r.code}`,
@@ -104,29 +102,38 @@ function RoomsPage() {
         pricePerNight: rt.pricePerNight ?? 0,
         status: rt.status ?? "inactive",
         roomStatus: r.status ?? "available",
-        typeImages: Array.isArray(rt.images) ? rt.images : [],
-        roomImages: Array.isArray(r.images) ? r.images : [],
+        typeImages: rt.images ?? [],
+        roomImages: r.images ?? [],
       }))
     );
+
     setData(flat);
   }
 
   useEffect(() => {
-    fetchData().catch(() => { });
+    fetchData();
   }, []);
+
+  /* -------------------------------------------------------------------------- */
+  /* FILTER */
+  /* -------------------------------------------------------------------------- */
 
   const filtered = useMemo(() => {
     return data.filter((row) => {
-      const okType = typeFilter === "all" || row.type === typeFilter;
-      const okStatus = statusFilter === "all" || row.status === statusFilter;
       const q = searchTerm.toLowerCase();
       const okQuery =
         !q ||
         row.code.toLowerCase().includes(q) ||
         row.name.toLowerCase().includes(q);
-      return okType && okStatus && okQuery;
+
+      const okType = typeFilter === "all" || row.type === typeFilter;
+      return okQuery && okType;
     });
-  }, [data, typeFilter, statusFilter, searchTerm]);
+  }, [data, searchTerm, typeFilter]);
+
+  /* -------------------------------------------------------------------------- */
+  /* EDIT */
+  /* -------------------------------------------------------------------------- */
 
   const openEdit = (row: Row) => {
     setEditing({
@@ -137,60 +144,26 @@ function RoomsPage() {
       bedType: row.bedType,
       description: row.description,
       pricePerNight: row.pricePerNight,
-      typeStatus: (row.status as "active" | "inactive") ?? "active",
-      roomStatus: row.roomStatus ?? "available",
+      typeStatus: row.status as any,
+      roomStatus: row.roomStatus as any,
       typeImages: row.typeImages,
       roomImages: row.roomImages,
     });
     setEditOpen(true);
   };
 
-  const saveEdit = async (vals: {
-    capacity?: number;
-    bedType?: string;
-    pricePerNight?: number;
-    description?: string;
-    typeStatus?: "active" | "inactive";
-    roomStatus?: "available" | "occupied" | "maintenance" | "inactive";
-    typeImages?: string[];
-  }) => {
+  const saveEdit = async (vals: any) => {
     if (!editing) return;
     setSaving(true);
     try {
-      const typePayload: any = {};
-      if (vals.capacity !== undefined) typePayload.capacity = vals.capacity;
-      if (vals.bedType !== undefined) typePayload.bedType = vals.bedType;
-      if (vals.pricePerNight !== undefined)
-        typePayload.pricePerNight = vals.pricePerNight;
-      if (vals.description !== undefined)
-        typePayload.description = vals.description;
-      if (vals.description !== undefined)
-        if (vals.typeStatus !== undefined) typePayload.status = vals.typeStatus;
-      if (vals.typeImages !== undefined) typePayload.images = vals.typeImages;
-
-      if (Object.keys(typePayload).length) {
-        await apiFetch(`/api/rooms/${editing.typeId}`, {
-          method: "PATCH",
-          auth: true,
-          body: JSON.stringify(typePayload),
-        });
-      }
-
-      if (vals.roomStatus !== undefined) {
-        const roomPayload: any = { status: vals.roomStatus };
-        await apiFetch(
-          `/api/rooms/${editing.typeId}/rooms/${encodeURIComponent(
-            editing.roomCode
-          )}`,
-          {
-            method: "PUT",
-            auth: true,
-            body: JSON.stringify(roomPayload),
-          }
-        );
-      }
+      await apiFetch(`/api/rooms/${editing.typeId}`, {
+        method: "PATCH",
+        auth: true,
+        body: JSON.stringify(vals),
+      });
 
       await fetchData();
+      showSuccess("Room updated successfully");
       setEditOpen(false);
       setEditing(null);
     } finally {
@@ -198,18 +171,25 @@ function RoomsPage() {
     }
   };
 
+  /* -------------------------------------------------------------------------- */
+  /* DELETE */
+  /* -------------------------------------------------------------------------- */
+
   const handleDelete = async (row: Row) => {
-    const ok = window.confirm(`Delete room ${row.code} in type ${row.type}?`);
-    if (!ok) return;
+    if (!confirm(`Delete room ${row.code}?`)) return;
+
     await apiFetch(
       `/api/rooms/${row.typeId}/rooms/${encodeURIComponent(row.code)}`,
-      {
-        method: "DELETE",
-        auth: true,
-      }
+      { method: "DELETE", auth: true }
     );
+
     await fetchData();
+    showSuccess("Room deleted successfully");
   };
+
+  /* -------------------------------------------------------------------------- */
+  /* TABLE */
+  /* -------------------------------------------------------------------------- */
 
   const roomColumns = [
     { key: "code", label: "Room Code" },
@@ -254,214 +234,79 @@ function RoomsPage() {
     },
   ];
 
-  const handleAddRooms = async () => {
-    if (!addTypeId) {
-      alert("กรุณาเลือก Room Type");
-      return;
-    }
-    if (!addPrefix) {
-      alert("กรุณากรอก Prefix");
-      return;
-    }
-    const count = addMode === "single" ? 1 : Number(addCount || 0);
-    if (!count || count < 1) {
-      alert("จำนวนห้องต้องมากกว่า 0");
-      return;
-    }
-
-    setAddSaving(true);
-    try {
-      await apiFetch(`/api/rooms/${addTypeId}/rooms`, {
-        method: "POST",
-        auth: true,
-        body: JSON.stringify({ prefix: addPrefix, count }),
-      });
-      await fetchData();
-      setAddOpen(false);
-      setAddTypeId("");
-      setAddPrefix("");
-      setAddCount(1);
-      setAddMode("single");
-    } finally {
-      setAddSaving(false);
-    }
-  };
-
-  // ใช้ typesList เพื่อสร้างรายการตัวกรอง "by type" ให้เสถียรกว่า
   const filterTypeOptions = useMemo(() => {
     const set = new Set(typesList.map((t) => t.type));
     return ["all", ...Array.from(set)];
   }, [typesList]);
 
+  /* -------------------------------------------------------------------------- */
+  /* UI */
+  /* -------------------------------------------------------------------------- */
+
   return (
     <AdminLayout>
       <div className="space-y-6">
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          className="flex items-center justify-between"
-        >
-          <h1 className="text-3xl font-bold text-gray-900">Rooms</h1>
-          <div className="flex gap-2">
-            <Button variant="outline" onClick={() => setAddOpen(true)}>
-              + Add Rooms
+
+        {/* 🔥 MOTION SUCCESS ALERT */}
+        <AnimatePresence>
+          {successMsg && (
+            <motion.div
+              initial={{ opacity: 0, x: 60 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: 60 }}
+              transition={{ duration: 0.35 }}
+              className="fixed top-6 right-6 z-50 w-80"
+            >
+              <Alert className="border-green-300 bg-green-50 shadow-lg">
+                <AlertTitle className="text-green-800">Success</AlertTitle>
+                <AlertDescription className="text-green-700">
+                  {successMsg}
+                </AlertDescription>
+              </Alert>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        <motion.div className="flex justify-between items-center">
+          <h1 className="text-3xl font-bold">Rooms</h1>
+          <Link href="/admin/rooms/new">
+            <Button>
+              <Plus className="mr-2 h-4 w-4" />
+              Add Room Type
             </Button>
-            <Link href="/admin/rooms/new">
-              <Button>
-                <Plus className="mr-2 h-4 w-4" />
-                Add Room Type
-              </Button>
-            </Link>
-          </div>
+          </Link>
         </motion.div>
 
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between"
-        >
-          <div className="flex flex-1 items-center gap-4">
-            <div className="relative flex-1 max-w-sm">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
-              <Input
-                placeholder="Search rooms..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-9"
-              />
-            </div>
+        <div className="flex gap-4">
+          <Input
+            placeholder="Search rooms..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
 
-            {/* filter by type (มาจาก typesList) */}
-            <Select value={typeFilter} onValueChange={setTypeFilter}>
-              <SelectTrigger className="w-48">
-                <SelectValue placeholder="Filter by type" />
-              </SelectTrigger>
-              <SelectContent>
-                {filterTypeOptions.map((opt) => (
-                  <SelectItem key={opt} value={opt}>
-                    {opt === "all" ? "All Types" : opt}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+          <Select value={typeFilter} onValueChange={setTypeFilter}>
+            <SelectTrigger className="w-48">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {filterTypeOptions.map((opt) => (
+                <SelectItem key={opt} value={opt}>
+                  {opt === "all" ? "All Types" : opt}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
 
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-48">
-                <SelectValue placeholder="Filter by status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Status</SelectItem>
-                <SelectItem value="active">Active</SelectItem>
-                <SelectItem value="inactive">Inactive</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        </motion.div>
+        <AdminTable columns={roomColumns} data={filtered} pageSize={5} />
 
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.1 }}
-        >
-          <AdminTable columns={roomColumns} data={filtered} />
-        </motion.div>
-
-        {/* Edit room dialog */}
         <EditRoomDialog
           open={editOpen}
-          onOpenChange={(v) => {
-            setEditOpen(v);
-            if (!v) setEditing(null);
-          }}
+          onOpenChange={setEditOpen}
           initial={editing}
           submitting={saving}
-          onSubmit={async (vals) => {
-            await saveEdit(vals);
-          }}
+          onSubmit={saveEdit}
         />
-
-        {/* Add Rooms Dialog (Single/Bulk) */}
-        <Dialog open={addOpen} onOpenChange={setAddOpen}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Add Rooms</DialogTitle>
-            </DialogHeader>
-
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Mode</label>
-                <Select
-                  value={addMode}
-                  onValueChange={(v) => setAddMode(v as "single" | "bulk")}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select mode" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="single">Single (1 room)</SelectItem>
-                    <SelectItem value="bulk">Bulk (multiple rooms)</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Room Type</label>
-                <Select value={addTypeId} onValueChange={setAddTypeId}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select room type" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {typesList.map((t) => (
-                      <SelectItem key={t._id} value={t._id}>
-                        {t.type}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Prefix</label>
-                  <Input
-                    placeholder="เช่น D"
-                    value={addPrefix}
-                    onChange={(e) => setAddPrefix(e.target.value)}
-                  />
-                </div>
-
-                {addMode === "bulk" && (
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Count</label>
-                    <Input
-                      type="number"
-                      min={1}
-                      value={addCount}
-                      onChange={(e) => setAddCount(Number(e.target.value))}
-                    />
-                  </div>
-                )}
-              </div>
-
-              <p className="text-xs text-gray-500">
-                ระบบจะสร้างรหัสห้องเป็นลำดับอัตโนมัติ เช่น D001, D002, ...
-              </p>
-            </div>
-
-            <div className="flex justify-end gap-2 pt-4">
-              <Button variant="outline" onClick={() => setAddOpen(false)}>
-                Cancel
-              </Button>
-              <Button onClick={handleAddRooms} disabled={addSaving}>
-                {addSaving
-                  ? "Saving..."
-                  : addMode === "single"
-                    ? "Add 1 Room"
-                    : "Add Rooms"}
-              </Button>
-            </div>
-          </DialogContent>
-        </Dialog>
       </div>
     </AdminLayout>
   );
