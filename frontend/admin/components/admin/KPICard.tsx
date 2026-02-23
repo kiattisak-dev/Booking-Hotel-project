@@ -26,27 +26,29 @@ export default function KPICard({ title, value, change, icon: Icon, color }: KPI
       className="h-full"
     >
       <Card className="h-full">
-        <CardContent className="p-6 h-full min-h-[140px] flex flex-col justify-between">
-          <div className="flex items-start justify-between">
-            <div className="space-y-1">
-              <p className="text-sm font-medium text-gray-600">{title}</p>
+        <CardContent className="p-4 xl:p-6 h-full min-h-[120px] flex flex-col justify-between">
+          <div className="flex items-start justify-between gap-2">
+            {/* Text section - ให้ขยายเต็มที่ก่อน icon */}
+            <div className="flex-1 min-w-0 space-y-1">
+              <p className="text-xs sm:text-sm font-medium text-gray-600 truncate">{title}</p>
               <motion.p
                 key={String(value)}
                 initial={{ opacity: 0, scale: 0.9 }}
                 animate={{ opacity: 1, scale: 1 }}
-                className="text-3xl font-semibold text-gray-900"
+                className="text-xl sm:text-2xl xl:text-3xl font-semibold text-gray-900 break-all leading-tight"
               >
                 {value}
               </motion.p>
               {change !== undefined && (
-                <p className={`text-sm ${change >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                <p className={`text-xs sm:text-sm ${change >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                   {change >= 0 ? '+' : ''}{change}%
                 </p>
               )}
             </div>
 
-            <div className={`p-3 rounded-full ${colorVariants[color]}`}>
-              <Icon className="h-6 w-6 text-white" />
+            {/* Icon - shrink ไม่ได้ */}
+            <div className={`flex-shrink-0 p-2 xl:p-3 rounded-full ${colorVariants[color]}`}>
+              <Icon className="h-5 w-5 xl:h-6 xl:w-6 text-white" />
             </div>
           </div>
         </CardContent>

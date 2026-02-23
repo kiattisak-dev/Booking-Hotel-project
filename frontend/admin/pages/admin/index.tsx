@@ -9,20 +9,29 @@ import StatusBadge from '@/components/admin/StatusBadge';
 import { withAdminAuth } from '@/lib/auth-guards';
 import { apiFetch } from '@/lib/api';
 
+type RoomType = {
+  _id?: string;
+  type?: string;
+  pricePerNight?: number;
+};
+
 type Booking = {
   _id: string;
   user: { firstName?: string; lastName?: string; email: string };
   roomCode?: string;
-  roomTypeId?: { type?: string };
+  roomTypeId?: RoomType;
   checkIn: string;
   checkOut: string;
   totalAmount?: number;
   status: string;
+  paymentStatus?: string;
   createdAt: string;
 };
 
 type PaymentSlip = {
   _id: string;
+  booking?: string;
+  amount?: number;
   status: string;
 };
 
@@ -32,9 +41,24 @@ const bookingColumns = [
   { key: 'room', label: 'Room' },
   { key: 'checkIn', label: 'Check In' },
   { key: 'checkOut', label: 'Check Out' },
-  { key: 'amount', label: 'Amount', render: (v: number) => `$${(v || 0).toLocaleString()}` },
+  { key: 'amount', label: 'Amount', render: (v: number) => `฿${(v || 0).toLocaleString()}` },
   { key: 'status', label: 'Status', render: (v: string) => <StatusBadge status={v} /> },
 ];
+
+function calcNights(checkIn: string, checkOut: string): number {
+  const start = new Date(checkIn).getTime();
+  const end = new Date(checkOut).getTime();
+  return Math.max(1, Math.ceil((end - start) / (1000 * 60 * 60 * 24)));
+}
+
+function resolveAmount(booking: Booking, latestSlipByBooking: Map<string, PaymentSlip>): number {
+  const slip = latestSlipByBooking.get(String(booking._id));
+  if (slip?.amount && Number.isFinite(Number(slip.amount))) return Number(slip.amount);
+  if (booking.totalAmount) return booking.totalAmount;
+  const price = Number(booking.roomTypeId?.pricePerNight ?? 0);
+  const nights = calcNights(booking.checkIn, booking.checkOut);
+  return price * nights;
+}
 
 function DashboardPage() {
   const [bookings, setBookings] = useState<Booking[]>([]);
@@ -51,21 +75,49 @@ function DashboardPage() {
 
   const stats = useMemo(() => {
     const todayStr = new Date().toISOString().slice(0, 10);
-    const todayBookings = bookings.filter(b => (b.createdAt || "").slice(0,10) === todayStr).length;
-    const totalRevenue = bookings.reduce((sum, b) => sum + (b.totalAmount || 0), 0);
-    const pendingSlips = slips.filter(s => s.status === "SUBMITTED").length;
-    const occupied = bookings.filter(b => b.status === "CONFIRMED").length;
-    const occupancyRate = bookings.length ? Math.round((occupied / bookings.length) * 100) : 0;
+    const todayBookings = bookings.filter(
+      (b) => (b.createdAt || "").slice(0, 10) === todayStr
+    ).length;
 
-    const recentRows = bookings.slice(-5).reverse().map(b => ({
-      guest: `${b.user?.firstName || ""} ${b.user?.lastName || ""}`.trim() || b.user?.email,
-      email: b.user?.email,
-      room: b.roomCode || b.roomTypeId?.type || "-",
-      checkIn: b.checkIn?.slice(0,10),
-      checkOut: b.checkOut?.slice(0,10),
-      amount: b.totalAmount || 0,
-      status: b.status,
-    }));
+    // สร้าง map: bookingId -> latest slip
+    const latestSlipByBooking = new Map<string, PaymentSlip>();
+    for (const s of slips) {
+      if (s.booking && !latestSlipByBooking.has(s.booking)) {
+        latestSlipByBooking.set(s.booking, s);
+      }
+    }
+
+    // นับเฉพาะ paymentStatus === "PAID" เท่านั้น
+    const totalRevenue = bookings
+      .filter((b) => b.paymentStatus === "PAID")
+      .reduce((sum, b) => sum + resolveAmount(b, latestSlipByBooking), 0);
+
+    const pendingSlips = slips.filter((s) => s.status === "SUBMITTED").length;
+    const occupied = bookings.filter((b) => b.status === "CONFIRMED").length;
+    const occupancyRate = bookings.length
+      ? Math.round((occupied / bookings.length) * 100)
+      : 0;
+
+    const recentRows = bookings
+      .slice(-5)
+      .reverse()
+      .map((b) => {
+        const roomDisplay = b.roomCode
+          ? `${b.roomTypeId?.type ? b.roomTypeId.type + " - " : ""}Room ${b.roomCode}`
+          : b.roomTypeId?.type || "-";
+
+        return {
+          guest:
+            `${b.user?.firstName || ""} ${b.user?.lastName || ""}`.trim() ||
+            b.user?.email,
+          email: b.user?.email,
+          room: roomDisplay,
+          checkIn: b.checkIn?.slice(0, 10),
+          checkOut: b.checkOut?.slice(0, 10),
+          amount: resolveAmount(b, latestSlipByBooking),
+          status: b.status,
+        };
+      });
 
     return { todayBookings, totalRevenue, pendingSlips, occupancyRate, recentRows };
   }, [bookings, slips]);
@@ -73,19 +125,50 @@ function DashboardPage() {
   return (
     <AdminLayout>
       <div className="space-y-6">
-        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex items-center justify-between">
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          className="flex items-center justify-between"
+        >
           <h1 className="text-3xl font-bold text-gray-900">Dashboard</h1>
-          <div className="text-sm text-gray-500">Welcome back! Here's what's happening today.</div>
+          <div className="text-sm text-gray-500">
+            Welcome back! Here's what's happening today.
+          </div>
         </motion.div>
 
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-          <KPICard title="Total Revenue" value={`$${stats.totalRevenue.toLocaleString()}`} change={0} icon={DollarSign} color="green" />
-          <KPICard title="Today's Bookings" value={stats.todayBookings} change={0} icon={Calendar} color="blue" />
-          <KPICard title="Pending Slips" value={stats.pendingSlips} icon={FileText} color="orange" />
-          <KPICard title="Occupancy Rate" value={`${stats.occupancyRate}%`} icon={TrendingUp} color="purple" />
+        <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
+          <KPICard
+            title="Total Revenue"
+            value={`฿${stats.totalRevenue.toLocaleString()}`}
+            icon={DollarSign}
+            color="green"
+          />
+          <KPICard
+            title="Today's Bookings"
+            value={stats.todayBookings}
+            icon={Calendar}
+            color="blue"
+          />
+          <KPICard
+            title="Pending Slips"
+            value={stats.pendingSlips}
+            icon={FileText}
+            color="orange"
+          />
+          <KPICard
+            title="Occupancy Rate"
+            value={`${stats.occupancyRate}%`}
+            icon={TrendingUp}
+            color="purple"
+          />
         </div>
 
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }} className="space-y-4">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.2 }}
+          className="space-y-4"
+        >
           <h2 className="text-xl font-semibold text-gray-900">Recent Bookings</h2>
           <AdminTable columns={bookingColumns} data={stats.recentRows} />
         </motion.div>
